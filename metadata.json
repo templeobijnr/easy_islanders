@@ -1,0 +1,7 @@
+{
+  "name": "Easy Islanders",
+  "description": "An AI-agent led marketplace for discovering exclusive island getaways and experiences.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

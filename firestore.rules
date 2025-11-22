@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isBusiness() {
+      return request.auth.token.role == 'business';
+    }
+
+    // --- LISTINGS ---
+    // Public Read, Business Create, Owner Edit
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isBusiness();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.ownerId);
+    }
+
+    // --- USERS ---
+    // Private Profiles
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+
+    // --- ANCHORS (Live Map) ---
+    // Short-lived location pings
+    match /anchors/{anchorId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      // Users can only delete their own anchors
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // --- BOOKINGS ---
+    // Users can read/write their own bookings
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // --- CHAT SESSIONS ---
+    // Users can read/write their own chat sessions
+    match /chatSessions/{sessionId} {
+      allow read, write: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && isOwner(get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId);
+      }
+    }
+
+    // --- SOCIAL FEATURES ---
+    // Public read for social content, authenticated write
+    match /socialPosts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    match /socialGroups/{groupId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    match /socialUsers/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+
+    match /waves/{waveId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    match /conversations/{conversationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // --- CRM (Business Only) ---
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isBusiness();
+    }
+
+    match /campaigns/{campaignId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isBusiness();
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isBusiness();
+    }
+  }
+}
