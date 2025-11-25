@@ -46,13 +46,15 @@ exports.chatRepository = {
     },
     // 3. Save Message
     // We allow saving 'parts' array directly to support Tool Calls in the future
-    saveMessage: async (sessionId, role, parts) => {
+    saveMessage: async (sessionId, role, parts, meta) => {
         await firebase_1.db.collection('chatSessions')
             .doc(sessionId)
             .collection('messages')
             .add({
             role,
             parts,
+            userId: (meta === null || meta === void 0 ? void 0 : meta.userId) || null,
+            agentId: (meta === null || meta === void 0 ? void 0 : meta.agentId) || null,
             timestamp: new Date().toISOString()
         });
         // Update parent session timestamp (for housekeeping)

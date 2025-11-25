@@ -12,6 +12,11 @@ interface AgentResponse {
   sessionId?: string;
   paymentRequest?: boolean;
   whatsappTriggered?: boolean;
+  mapLocation?: {
+    lat: number;
+    lng: number;
+    title: string;
+  };
 }
 
 export const sendMessageToAgent = async (
@@ -90,7 +95,26 @@ export const sendMessageToAgent = async (
     if (!response.ok) {
       const errorText = await response.text();
       console.error('🔴 [Chat] Error response:', errorText);
-      throw new Error(`Backend Error: ${response.status} - ${errorText}`);
+
+      // Try to parse error as JSON for better error messages
+      let errorMessage = "I'm having trouble reaching the main office. Please check your connection.";
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message || errorJson.error) {
+          errorMessage = `Sorry, there was an issue: ${errorJson.message || errorJson.error}`;
+        }
+      } catch {
+        // If not JSON, use status-based messages
+        if (response.status === 401 || response.status === 403) {
+          errorMessage = "You need to be logged in to do that.";
+        } else if (response.status === 404) {
+          errorMessage = "The service you're looking for isn't available right now.";
+        } else if (response.status >= 500) {
+          errorMessage = "Our system is having a brief issue. Please try again in a moment.";
+        }
+      }
+
+      return { text: errorMessage };
     }
 
     const data = await response.json();
@@ -114,112 +138,50 @@ export const sendMessageToAgent = async (
       throw error; // Re-throw to let UI handle login
     }
 
-    return { text: "I'm having trouble reaching the main office. Please check your connection." };
+    // Network errors
+    if (error.message.includes('fetch') || error.message.includes('network')) {
+      return { text: "I'm having trouble connecting. Please check your internet connection." };
+    }
+
+    // Generic fallback
+    return { text: "Something unexpected happened. Please try again." };
   }
 };
 
-// --- Live Listing Import ---
-import { GoogleGenAI } from '@google/genai';
-
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-// Initialize the new GenAI client
-// Note: We use a try-catch block for initialization in case the key is missing to avoid crashing the app on load
-let ai: GoogleGenAI | null = null;
-try {
-  if (apiKey) {
-    ai = new GoogleGenAI({ apiKey });
-  }
-} catch (e) {
-  console.error("Failed to initialize Google GenAI client:", e);
-}
-
+// ✅ SECURE: Property import now calls backend instead of using Gemini directly on client
 export const importPropertyFromUrl = async (url: string): Promise<any> => {
-  if (!apiKey || !ai) {
-    console.error("API Key missing or client not initialized for importPropertyFromUrl");
-    return null;
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    console.error('❌ [Import] No user logged in');
+    throw new Error('AUTH_REQUIRED');
   }
+
+  const token = await currentUser.getIdToken();
+  console.log('🔵 [Import] Importing property from URL:', url);
 
   try {
-    // Use Gemini 3 Pro Preview for complex reasoning and extraction from search results
-    // Fallback to gemini-1.5-pro if 3.0 is not available to the key
-    const modelName = 'gemini-2.0-flash-exp'; // Using a known strong model available in preview, or stick to user request if confident
-    // User requested 'gemini-3-pro-preview'. Let's try it, but wrap in try/catch to fallback.
+    const response = await fetch(`${API_URL}/import/property`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ url })
+    });
 
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp', // 3.0 preview might not be public yet, using 2.0 flash exp which is very capable
-        contents: `
-            Analyze this Real Estate listing URL: ${url}
-            
-            Perform a Google Search to find the content of this specific listing. 
-            Extract the details and return them in a strict JSON object format.
-            
-            Target Fields:
-            - title: string (The property title)
-            - price: number (numeric value only, remove currency symbols)
-            - currency: string (e.g. GBP, USD, EUR, TRY)
-            - location: string (District, City, or Area)
-            - description: string (Summarize the property description)
-            - bedrooms: number
-            - bathrooms: number
-            - squareMeters: number (Closed area size)
-            - plotSize: number (Land size if applicable)
-            - category: string (e.g. Villa, Apartment, Bungalow, Land)
-            - rentalType: string (Infer one of: 'sale', 'short-term', 'long-term', 'project')
-            - amenities: array of strings (List features like Pool, AC, Generator, etc.)
-            - images: array of strings (Try to find actual image URLs if visible in search results, otherwise empty array)
-
-            If a field is not found, use null or 0.
-            Output ONLY the JSON string. Do not wrap in markdown code blocks.
-        `,
-        config: { tools: [{ googleSearch: {} }] }
-      });
-    } catch (innerError) {
-      console.warn("Gemini 2.0 Flash Exp failed, falling back to 2.0 Flash", innerError);
-      response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: `
-                Analyze this Real Estate listing URL: ${url}
-                
-                Perform a Google Search to find the content of this specific listing. 
-                Extract the details and return them in a strict JSON object format.
-                
-                Target Fields:
-                - title: string
-                - price: number
-                - currency: string
-                - location: string
-                - description: string
-                - bedrooms: number
-                - bathrooms: number
-                - squareMeters: number
-                - plotSize: number
-                - category: string
-                - rentalType: string
-                - amenities: array of strings
-                - images: array of strings
-
-                Output ONLY the JSON string.
-            `,
-        config: { tools: [{ googleSearch: {} }] }
-      });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('🔴 [Import] Error:', errorText);
+      throw new Error(`Import failed: ${response.status}`);
     }
 
-    const text = response.text || "";
-    // Clean up any potential markdown formatting
-    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = await response.json();
+    console.log('✅ [Import] Property imported successfully:', data);
+    return data;
 
-    const start = cleanedText.indexOf('{');
-    const end = cleanedText.lastIndexOf('}');
-
-    if (start !== -1 && end !== -1) {
-      const jsonStr = cleanedText.substring(start, end + 1);
-      return JSON.parse(jsonStr);
-    }
-    return null;
-  } catch (e) {
-    console.error("Import failed:", e);
+  } catch (error) {
+    console.error("🔴 [Import] Failed:", error);
     return null;
   }
 };

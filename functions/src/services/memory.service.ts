@@ -14,8 +14,52 @@ export const memoryService = {
     },
 
     // Call this when building the System Prompt
-    getContext: async (userId: string) => {
+    getContext: async (userId: string, agentId?: string) => {
         const doc = await db.collection('users').doc(userId).collection('memory').doc('main').get();
-        return doc.data() || {};
+        const full = doc.data() || {};
+
+        // 1. Core Context (Always Needed)
+        const core = {
+            name: full.name || null,
+            style: full.style || null, // e.g. "Direct", "Polite"
+        };
+
+        // 2. Domain Slicing
+        let slice = {};
+
+        switch (agentId) {
+            case 'agent_estate':
+                slice = {
+                    budget: full.budget,
+                    preferredAreas: full.preferredAreas,
+                    propertyType: full.propertyType,
+                    investmentIntent: full.investmentIntent
+                };
+                break;
+            case 'agent_auto':
+                slice = {
+                    carPreference: full.carPreference,
+                    licenseType: full.licenseType
+                };
+                break;
+            case 'agent_gourmet':
+                slice = {
+                    dietaryRestrictions: full.dietaryRestrictions,
+                    favoriteCuisines: full.favoriteCuisines,
+                    diningBudget: full.diningBudget
+                };
+                break;
+            default:
+                // Fallback: Return a bit more for general concierge
+                slice = {
+                    interests: full.interests,
+                    familySize: full.familySize
+                };
+        }
+
+        // Remove null/undefined keys to save tokens
+        const clean = (obj: any) => Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null));
+
+        return { ...clean(core), ...clean(slice) };
     }
 };

@@ -42,3 +42,15 @@ export interface SearchIndexRecord extends Omit<Listing, 'createdAt' | 'updatedA
     // e.g. metadata.bedrooms -> bedrooms
     [key: string]: any;
 }
+
+export interface SocialUser {
+    id: string;
+    name: string;
+    avatar: string;
+    rank: string;
+    points: number;
+    coordinates?: { lat: number; lng: number };
+    currentMood?: string;
+    interests?: string[];
+    trustScore?: number;
+}

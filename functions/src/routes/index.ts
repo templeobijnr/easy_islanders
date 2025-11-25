@@ -2,7 +2,22 @@ import { Router } from 'express';
 import { handleChatMessage } from '../controllers/chat.controller';
 import { searchListings } from '../controllers/search.controller';
 import { createPaymentIntent } from '../controllers/payment.controller';
-import { importListingFromUrl } from '../controllers/listing.controller';
+import {
+    importListingFromUrl,
+    createListing,
+    updateListing,
+    deleteListing,
+    getUserListings,
+    getListingById
+} from '../controllers/listing.controller';
+import { importPropertyFromUrl } from '../controllers/import.controller';
+import { Request, Response } from 'express';
+import { sendTaxiRequest } from '../services/twilio.service';
+import { db } from '../config/firebase';
+import { availabilityRepository } from '../repositories/availability.repository';
+import { messageRepository } from '../repositories/message.repository';
+import { populateDatabase } from '../controllers/populate.controller';
+import { getNearbyUsers, waveAtUser } from '../controllers/user.controller';
 import { isAuthenticated } from '../middleware/auth';
 
 const router = Router();
@@ -16,8 +31,274 @@ router.post('/search', searchListings);
 // Payments
 router.post('/payments/create-intent', isAuthenticated, createPaymentIntent);
 
-// Listings
+// Listings CRUD
+router.post('/listings', isAuthenticated, createListing);
+router.put('/listings/:id', isAuthenticated, updateListing);
+router.delete('/listings/:id', isAuthenticated, deleteListing);
+router.get('/listings', isAuthenticated, getUserListings);
+router.get('/listings/:id', getListingById); // Public endpoint
+
+// Listings Import
 router.post('/listings/import', isAuthenticated, importListingFromUrl);
+
+// Property Import (AI-powered)
+router.post('/import/property', isAuthenticated, importPropertyFromUrl);
+
+// Availability endpoints
+router.get('/listings/:id/availability', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { start, end } = req.query;
+    const slots = await availabilityRepository.list(id, start as string | undefined, end as string | undefined);
+    res.json(slots);
+});
+
+router.post('/listings/:id/availability', isAuthenticated, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { slotId, slot } = req.body;
+    const saved = await availabilityRepository.upsert(id, slotId, slot);
+    res.json(saved);
+});
+
+// Listing messages endpoints
+router.get('/listings/:id/messages', isAuthenticated, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { limit } = req.query;
+    const messages = await messageRepository.list(id, limit ? parseInt(limit as string, 10) : 50);
+    res.json(messages);
+});
+
+router.post('/listings/:id/messages', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const msg = req.body;
+    const created = await messageRepository.create(id, msg);
+    res.json(created);
+});
+
+// Taxi Dispatch System
+import * as taxiController from '../controllers/taxi.controller';
+router.post('/taxi/request', isAuthenticated, taxiController.requestTaxi);
+router.post('/taxi/webhook', taxiController.webhookTwilio); // Twilio WhatsApp callback
+
+// WhatsApp outbound for taxi requests (Legacy)
+router.post('/whatsapp/taxi-request', async (req: Request, res: Response) => {
+    try {
+        const { to, customerContact, pickup, destination, notes } = req.body;
+        const resp = await sendTaxiRequest(to, { customerContact, pickup, destination, notes });
+        // Persist request log
+        await db.collection('taxiRequests').add({
+            to,
+            customerContact,
+            pickup,
+            destination,
+            notes: notes || '',
+            sentAt: new Date().toISOString(),
+            sid: resp.sid,
+            status: resp.status
+        });
+        res.json({ success: true, sid: resp.sid, status: resp.status });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message || 'Failed to send taxi request' });
+    }
+});
+
+// WhatsApp inbound webhook (Twilio)
+router.post('/whatsapp/webhook', async (req: Request, res: Response) => {
+    try {
+        const { From, Body, To, MessageSid } = req.body;
+        const from = (From || '').replace('whatsapp:', '');
+        const text = Body || '';
+
+        console.log('📨 [WhatsApp Webhook] Received message:', { from, to: To, text });
+
+        // Persist inbound message
+        const messageRef = await db.collection('whatsappMessages').add({
+            from: From,
+            to: To,
+            body: text,
+            direction: 'inbound',
+            messageSid: MessageSid,
+            receivedAt: new Date().toISOString()
+        });
+
+        // VENDOR REPLY INTERCEPTOR: Check if this is a vendor responding to an order
+        const { handleVendorReply } = await import('../services/vendorReply.service');
+        const isVendorReply = await handleVendorReply(From, text);
+
+        if (isVendorReply) {
+            // This was a vendor reply - we've handled it, don't process as user chat
+            console.log('✅ [WhatsApp Webhook] Message handled as vendor reply');
+            res.status(200).send('OK');
+            return;
+        }
+
+        // If not a vendor reply, continue with normal processing
+        console.log('ℹ️ [WhatsApp Webhook] Processing as user message');
+        const textLower = text.toLowerCase();
+
+        // Handle taxi booking responses
+        if (textLower.includes('taxi') || textLower.includes('driver') || textLower.includes('pickup')) {
+            const taxiBookings = await db.collection('taxiBookings')
+                .where('status', '==', 'pending')
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+
+            for (const bookingDoc of taxiBookings.docs) {
+                const booking = bookingDoc.data();
+                const isConfirmed = textLower.includes('confirm') || textLower.includes('accept') || textLower.includes('on my way');
+
+                // Update the most recent pending booking
+                await bookingDoc.ref.update({
+                    status: isConfirmed ? 'confirmed' : 'updated',
+                    driverResponse: text,
+                    driverPhone: from,
+                    respondedAt: new Date().toISOString()
+                });
+                console.log(`✅ Updated taxi booking ${bookingDoc.id} with driver response`);
+
+                // Trigger agent to notify the user
+                if (booking.userId) {
+                    const userSessionId = `session_${booking.userId}_agent_default`;
+                    const notificationMessage = isConfirmed
+                        ? `Great news! Your taxi booking has been confirmed. The driver says: "${text}". They should arrive at ${booking.pickupLocation} soon!`
+                        : `Update on your taxi booking: ${text}`;
+
+                    // Add system message to user's chat session
+                    await db.collection('chatSessions').doc(userSessionId).collection('messages').add({
+                        role: 'model',
+                        parts: [{ text: notificationMessage }],
+                        userId: booking.userId,
+                        agentId: 'agent_default',
+                        timestamp: new Date().toISOString(),
+                        source: 'system_notification',
+                        bookingId: bookingDoc.id
+                    });
+
+                    // Update session's last message time
+                    await db.collection('chatSessions').doc(userSessionId).set({
+                        lastMessageAt: new Date().toISOString()
+                    }, { merge: true });
+
+                    // Send WhatsApp to user if they have a phone number
+                    if (booking.customerContact) {
+                        try {
+                            const { sendWhatsApp } = await import('../services/twilio.service');
+                            await sendWhatsApp(booking.customerContact, notificationMessage);
+                            console.log(`📱 Sent WhatsApp notification to user ${booking.userId}`);
+                        } catch (err) {
+                            console.error('⚠️ Failed to send WhatsApp to user:', err);
+                        }
+                    }
+
+                    console.log(`🔔 Notified user ${booking.userId} about taxi booking update`);
+                }
+
+                break; // Only update the first (most recent) one
+            }
+        }
+
+        // Handle viewing request responses
+        if (textLower.includes('viewing') || textLower.includes('property') || textLower.includes('apartment')) {
+            const viewingRequests = await db.collection('viewingRequests')
+                .where('status', '==', 'pending')
+                .where('listingOwnerContact', '==', from)
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+
+            for (const viewingDoc of viewingRequests.docs) {
+                const viewing = viewingDoc.data();
+                const isConfirmed = textLower.includes('confirm') || textLower.includes('accept') || textLower.includes('yes');
+
+                await viewingDoc.ref.update({
+                    status: isConfirmed ? 'confirmed' : 'updated',
+                    ownerResponse: text,
+                    respondedAt: new Date().toISOString()
+                });
+                console.log(`✅ Updated viewing request ${viewingDoc.id} with owner response`);
+
+                // Trigger agent to notify the user
+                if (viewing.userId) {
+                    const userSessionId = `session_${viewing.userId}_agent_default`;
+                    const notificationMessage = isConfirmed
+                        ? `Excellent! Your viewing request for "${viewing.listingTitle}" has been confirmed. The owner says: "${text}". Viewing scheduled for ${viewing.preferredSlot}.`
+                        : `Update on your viewing request for "${viewing.listingTitle}": ${text}`;
+
+                    // Add system message to user's chat session
+                    await db.collection('chatSessions').doc(userSessionId).collection('messages').add({
+                        role: 'model',
+                        parts: [{ text: notificationMessage }],
+                        userId: viewing.userId,
+                        agentId: 'agent_default',
+                        timestamp: new Date().toISOString(),
+                        source: 'system_notification',
+                        viewingRequestId: viewingDoc.id
+                    });
+
+                    // Update session's last message time
+                    await db.collection('chatSessions').doc(userSessionId).set({
+                        lastMessageAt: new Date().toISOString()
+                    }, { merge: true });
+
+                    // Send WhatsApp to user if they have a phone number
+                    if (viewing.customerContact) {
+                        try {
+                            const { sendWhatsApp } = await import('../services/twilio.service');
+                            await sendWhatsApp(viewing.customerContact, notificationMessage);
+                            console.log(`📱 Sent WhatsApp notification to user ${viewing.userId}`);
+                        } catch (err) {
+                            console.error('⚠️ Failed to send WhatsApp to user:', err);
+                        }
+                    }
+
+                    console.log(`🔔 Notified user ${viewing.userId} about viewing request update`);
+                }
+
+                break;
+            }
+        }
+
+        // Attempt to map to user/session (fallback session per phone)
+        let userId: string | null = null;
+        const userSnap = await db.collection('users').where('phoneNumber', '==', from).limit(1).get();
+        if (!userSnap.empty) {
+            userId = userSnap.docs[0].id;
+        }
+        const sessionId = userId ? `whatsapp_${userId}` : `whatsapp_${from}`;
+
+        // Write into chat session so it appears in UI
+        await db.collection('chatSessions').doc(sessionId).set({
+            id: sessionId,
+            userId: userId || null,
+            agentId: 'agent_whatsapp',
+            createdAt: new Date().toISOString(),
+            lastMessageAt: new Date().toISOString()
+        }, { merge: true });
+
+        await db.collection('chatSessions').doc(sessionId).collection('messages').add({
+            role: 'model',
+            parts: [{ text }],
+            userId: userId || null,
+            agentId: 'agent_whatsapp',
+            timestamp: new Date().toISOString(),
+            source: 'whatsapp',
+            whatsappMessageId: messageRef.id
+        });
+
+        // Acknowledge immediately to Twilio
+        res.status(200).send('OK');
+    } catch (err: any) {
+        console.error('❌ [WhatsApp webhook] Error:', err);
+        res.status(500).send('ERROR');
+    }
+});
+
+// Database Population (Admin only)
+router.post('/admin/populate', populateDatabase);
+
+// Social / Connect
+router.get('/users/nearby', isAuthenticated, getNearbyUsers);
+router.post('/users/wave', isAuthenticated, waveAtUser);
 
 // Health Check
 router.get('/health', (req, res) => {

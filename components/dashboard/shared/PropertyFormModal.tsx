@@ -19,21 +19,34 @@ interface PropertyFormModalProps {
     initialView?: 'overview' | 'edit';
 }
 
-type FormTab = 'essentials' | 'specs' | 'legal' | 'amenities' | 'media' | 'location';
+type FormTab = 'essentials' | 'details' | 'location' | 'amenities' | 'media';
 
-const RENTAL_TYPES = [
+const LISTING_TYPES = [
     { id: 'sale', label: 'For Sale' },
-    { id: 'short-term', label: 'Daily / Holiday' },
-    { id: 'long-term', label: 'Long Term Rental' },
+    { id: 'short-term', label: 'Short-Term Rental' },
+    { id: 'long-term', label: 'Long-Term Rental' },
     { id: 'project', label: 'Off-Plan Project' }
 ];
-const PROPERTY_TYPES = ['Apartment', 'Villa', 'Penthouse', 'Bungalow', 'Townhouse', 'Semi-Detached', 'Land', 'Commercial'];
+
+const PROPERTY_TYPES = [
+    'Villa', 'Semi-Detached', 'Residence', 'Detached House', 'Timeshare',
+    'Unfinished Building', 'Flat', 'Penthouse', 'Bungalow', 'Complete Building'
+];
+
 const LOCATIONS = ['Kyrenia', 'Bellapais', 'Catalkoy', 'Esentepe', 'Lapta', 'Alsancak', 'Nicosia', 'Famagusta', 'Iskele', 'Long Beach'];
-const AMENITY_GROUPS = {
-    "Interior": ['AC', 'Central Heating', 'Fireplace', 'Smart Home', 'White Goods'],
-    "Exterior": ['Private Pool', 'Garden', 'BBQ Area', 'Roof Terrace', 'Garage'],
-    "Community": ['Gated', 'Security', 'Gym', 'Spa', 'Generator']
-};
+
+const FURNISHING_STATUS = ['Unfurnished', 'Semi-Furnished', 'Fully Furnished'];
+const DEED_TYPES = ['Exchange Title', 'Turkish Title', 'TMD Title', 'Leasehold'];
+
+const AMENITY_OPTIONS = [
+    'Pool', 'Gym', 'Wi-Fi', 'Hot Tub', 'Air Conditioning', 'Sea View',
+    'Heating', 'TV', 'Mountain View', 'Kitchen', 'Spa', 'Microwave',
+    'Flat Screen TV', 'Shower', 'Sauna', 'Toilets', 'Linens',
+    'Private Garden', 'Garage', 'Solar Panels', 'Fireplace',
+    'Gated Community', 'Security 24/7', 'Generator', 'Smart Home',
+    'BBQ Area', 'Jacuzzi', 'Elevator', 'White Goods', 'Balcony',
+    'Terrace', 'Parking', 'Storage Room', 'Walk-in Closet'
+];
 
 const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, onSave, initialData, isEditMode, initialView = 'overview' }) => {
     const [viewMode, setViewMode] = useState<'overview' | 'edit'>(!isEditMode ? 'edit' : initialView);
@@ -63,6 +76,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         squareMeters: 0, plotSize: 0, buildYear: 2024, furnishedStatus: 'Unfurnished',
         amenities: [], imageUrl: '', images: [],
         latitude: 35.3300, longitude: 33.3200,
+        formattedAddress: '',
         status: 'draft'
     });
     const mapboxToken = (import.meta as any).env?.VITE_MAPBOX_TOKEN as string | undefined;
@@ -77,10 +91,13 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                 squareMeters: 0, plotSize: 0, buildYear: 2024, furnishedStatus: 'Unfurnished',
                 amenities: [], imageUrl: '', images: [],
                 latitude: 35.3300, longitude: 33.3200,
+                formattedAddress: '',
                 status: 'draft'
             });
         }
     }, [isOpen, initialData, initialView, isEditMode]);
+
+    const canonicalDistricts = ['Kyrenia', 'Girne', 'Catalkoy', 'Çatalköy', 'Bellapais', 'Alsancak', 'Lapta', 'Iskele', 'Famagusta', 'Nicosia', 'Lefkosa'];
 
     useEffect(() => {
         if (!mapboxToken || searchQuery.trim().length < 3) {
@@ -91,9 +108,28 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         const fetchSuggestions = async () => {
             try {
                 setLocationLoading(true);
-                const resp = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${mapboxToken}&autocomplete=true&limit=5`, { signal: controller.signal });
+                const bbox = '32.0,34.0,35.0,36.8'; // Rough Cyprus/N. Cyprus box
+                const proximityLng = form.longitude || 33.32;
+                const proximityLat = form.latitude || 35.33;
+                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${mapboxToken}&autocomplete=true&limit=5&types=address,place,locality,poi&country=cy,tr&bbox=${bbox}&proximity=${proximityLng},${proximityLat}&language=en`;
+                const resp = await fetch(url, { signal: controller.signal });
                 const data = await resp.json();
-                setLocationSuggestions(data.features || []);
+                const features = (data.features || []).filter((f: any) => f.place_name);
+                // Fallback to canonical list if empty
+                if (features.length === 0) {
+                    const fallback = canonicalDistricts
+                        .filter(d => d.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map((d, idx) => ({
+                            id: `fallback-${idx}`,
+                            text: d,
+                            place_name: d,
+                            center: [proximityLng, proximityLat],
+                            context: []
+                        }));
+                    setLocationSuggestions(fallback);
+                } else {
+                    setLocationSuggestions(features);
+                }
             } catch (err) {
                 if (!(err instanceof DOMException)) {
                     console.error('Geocode error', err);
@@ -104,7 +140,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         };
         fetchSuggestions();
         return () => controller.abort();
-    }, [mapboxToken, searchQuery]);
+    }, [mapboxToken, searchQuery, form.latitude, form.longitude]);
 
     useEffect(() => {
         const initMap = async () => {
@@ -122,6 +158,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                 mapRef.current.on('click', (e: any) => {
                     setForm((prev: any) => ({ ...prev, latitude: e.lngLat.lat, longitude: e.lngLat.lng }));
                     placeMarker(mapboxgl.default, e.lngLat.lng, e.lngLat.lat);
+                    reverseGeocode(e.lngLat.lng, e.lngLat.lat);
                 });
             } else {
                 mapRef.current.setCenter([form.longitude || 33.3200, form.latitude || 35.3300]);
@@ -144,14 +181,48 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         }
     };
 
-    const handleSuggestionSelect = async (feature: any) => {
+    const buildLocationFromFeature = (feature: any) => {
         const [lng, lat] = feature.center || [];
-        setForm((prev: any) => ({
-            ...prev,
+        const ctx = feature.context || [];
+        const district = ctx.find((c: any) => c.id?.startsWith('place') || c.id?.startsWith('locality'))?.text || feature.text;
+        const region = ctx.find((c: any) => c.id?.startsWith('region'))?.text;
+        const country = ctx.find((c: any) => c.id?.startsWith('country'))?.text;
+        return {
             latitude: lat,
             longitude: lng,
-            location: feature.text,
-            placeName: feature.place_name
+            location: district || feature.text,
+            placeName: feature.place_name,
+            formattedAddress: feature.place_name,
+            region,
+            country
+        };
+    };
+
+    const reverseGeocode = async (lng?: number, lat?: number) => {
+        if (!mapboxToken || lng === undefined || lat === undefined) return;
+        try {
+            const resp = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=address,place,locality,region&limit=1`);
+            const data = await resp.json();
+            const feature = data.features?.[0];
+            if (feature) {
+                const parsed = buildLocationFromFeature(feature);
+                setForm((prev: any) => ({
+                    ...prev,
+                    ...parsed
+                }));
+                setSearchQuery(parsed.formattedAddress);
+            }
+        } catch (err) {
+            console.error('Reverse geocode failed', err);
+        }
+    };
+
+    const handleSuggestionSelect = async (feature: any) => {
+        const [lng, lat] = feature.center || [];
+        const parsed = buildLocationFromFeature(feature);
+        setForm((prev: any) => ({
+            ...prev,
+            ...parsed
         }));
         setSearchQuery(feature.place_name);
         setLocationSuggestions([]);
@@ -173,8 +244,8 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
         setLocationError(null);
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const { latitude, longitude } = pos.coords;
-            setForm((prev: any) => ({ ...prev, latitude, longitude, placeName: 'My Location' }));
-            setSearchQuery(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+            setForm((prev: any) => ({ ...prev, latitude, longitude }));
+            await reverseGeocode(longitude, latitude);
             if (mapboxToken && mapRef.current) {
                 const mapboxgl = await import('mapbox-gl');
                 mapboxgl.default.accessToken = mapboxToken;
@@ -402,10 +473,9 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
             <div className="px-6 pt-2 bg-white border-b border-slate-100 flex items-end gap-1 overflow-x-auto scrollbar-hide">
                 {[
                     { id: 'essentials', label: 'Essentials', icon: Layers },
-                    { id: 'specs', label: 'Specs', icon: Ruler },
+                    { id: 'details', label: 'Property Details', icon: Ruler },
                     { id: 'location', label: 'Location', icon: MapPin },
                     { id: 'amenities', label: 'Amenities', icon: List },
-                    { id: 'legal', label: 'Legal', icon: FileText },
                     { id: 'media', label: 'Photos', icon: ImageIcon }
                 ].map(tab => (
                     <button key={tab.id} onClick={() => setActiveFormTab(tab.id as FormTab)} className={`flex items-center gap-2 px-5 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeFormTab === tab.id ? 'border-slate-900 text-slate-900 bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
@@ -433,51 +503,303 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                 <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
 
                     {activeFormTab === 'essentials' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in">
-                            <div className="col-span-2"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label><input className="w-full p-3 border border-slate-200 rounded-xl font-bold text-lg" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label><select className="w-full p-3 border border-slate-200 rounded-xl" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label><select className="w-full p-3 border border-slate-200 rounded-xl" value={form.rentalType} onChange={e => setForm({ ...form, rentalType: e.target.value })}>{RENTAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Price (£)</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.price} onChange={e => setForm({ ...form, price: parseInt(e.target.value) })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">District</label><select className="w-full p-3 border border-slate-200 rounded-xl" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}>{LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-                            <div className="col-span-2"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label><textarea className="w-full p-3 border border-slate-200 rounded-xl h-32" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-                        </div>
-                    )}
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Title */}
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Title</label>
+                                    <input
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-lg"
+                                        value={form.title}
+                                        onChange={e => setForm({ ...form, title: e.target.value })}
+                                        placeholder="e.g., Luxury 3-Bed Villa with Pool"
+                                    />
+                                </div>
 
-                    {/* ... (Include other tabs logic from previous implementation: Specs, Legal, Amenities, Media, Location) ... */}
-                    {activeFormTab === 'specs' && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 animate-in fade-in">
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bedrooms</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.bedrooms} onChange={e => setForm({ ...form, bedrooms: parseInt(e.target.value) })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bathrooms</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.bathrooms} onChange={e => setForm({ ...form, bathrooms: parseInt(e.target.value) })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Area (m²)</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.squareMeters} onChange={e => setForm({ ...form, squareMeters: parseInt(e.target.value) })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Plot Size (m²)</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.plotSize} onChange={e => setForm({ ...form, plotSize: parseInt(e.target.value) })} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Build Year</label><input type="number" className="w-full p-3 border border-slate-200 rounded-xl" value={form.buildYear} onChange={e => setForm({ ...form, buildYear: parseInt(e.target.value) })} /></div>
-                        </div>
-                    )}
+                                {/* Property Type */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Property Type</label>
+                                    <select
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                        value={form.category}
+                                        onChange={e => setForm({ ...form, category: e.target.value })}
+                                    >
+                                        {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
 
-                    {activeFormTab === 'legal' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in">
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Furnishing</label><select className="w-full p-3 border border-slate-200 rounded-xl" value={form.furnishedStatus} onChange={e => setForm({ ...form, furnishedStatus: e.target.value })}><option>Unfurnished</option><option>Semi-Furnished</option><option>Fully Furnished</option></select></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title Deed</label><select className="w-full p-3 border border-slate-200 rounded-xl" value={form.titleDeedType} onChange={e => setForm({ ...form, titleDeedType: e.target.value })}><option>Exchange Title</option><option>Turkish Title</option><option>TMD Title</option><option>Leasehold</option></select></div>
-                        </div>
-                    )}
+                                {/* Listing Type (formerly Status) */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Listing Type</label>
+                                    <select
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                        value={form.rentalType}
+                                        onChange={e => setForm({ ...form, rentalType: e.target.value })}
+                                    >
+                                        {LISTING_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                    </select>
+                                </div>
 
-                    {activeFormTab === 'amenities' && (
-                        <div className="space-y-6 animate-in fade-in">
-                            {Object.entries(AMENITY_GROUPS).map(([group, items]) => (
-                                <div key={group}>
-                                    <h4 className="font-bold text-slate-900 mb-3">{group}</h4>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                        {items.map(item => {
-                                            const isSelected = form.amenities?.includes(item);
-                                            return (
-                                                <button key={item} onClick={() => { const current = form.amenities || []; setForm({ ...form, amenities: isSelected ? current.filter((a: string) => a !== item) : [...current, item] }) }} className={`p-3 rounded-xl text-left text-sm font-medium border flex items-center gap-2 ${isSelected ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
-                                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-white' : 'border-slate-300'}`}>{isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}</div> {item}
-                                                </button>
-                                            )
-                                        })}
+                                {/* Dynamic Price Field */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                        {form.rentalType === 'short-term' && 'Daily Price'}
+                                        {form.rentalType === 'long-term' && 'Monthly Price'}
+                                        {form.rentalType === 'sale' && 'Sales Price'}
+                                        {form.rentalType === 'project' && 'Project Price'}
+                                        {!form.rentalType && 'Price'}
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
+                                        <input
+                                            type="number"
+                                            value={form.price}
+                                            onChange={e => setForm({ ...form, price: parseInt(e.target.value) })}
+                                            className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-bold"
+                                            placeholder="0"
+                                        />
                                     </div>
                                 </div>
-                            ))}
+
+                                {/* Deposit & Cleaning Fee for Short-term */}
+                                {form.rentalType === 'short-term' && (
+                                    <>
+                                        <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                                            <input
+                                                type="checkbox"
+                                                id="depositNeeded"
+                                                checked={form.depositNeeded || false}
+                                                onChange={e => setForm({ ...form, depositNeeded: e.target.checked })}
+                                                className="w-5 h-5 text-blue-600 rounded"
+                                            />
+                                            <label htmlFor="depositNeeded" className="text-sm font-bold text-blue-900 cursor-pointer">
+                                                Deposit Required?
+                                            </label>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cleaning Fee</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
+                                                <input
+                                                    type="number"
+                                                    value={form.cleaningFee || 0}
+                                                    onChange={e => setForm({ ...form, cleaningFee: parseInt(e.target.value) })}
+                                                    className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Monthly Deposit for Long-term */}
+                                {form.rentalType === 'long-term' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Monthly Deposit Needed</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
+                                            <input
+                                                type="number"
+                                                value={form.monthlyDeposit || 0}
+                                                onChange={e => setForm({ ...form, monthlyDeposit: parseInt(e.target.value) })}
+                                                className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Title Deed & Payment Plan for Sale */}
+                                {form.rentalType === 'sale' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Title Deed Type</label>
+                                            <select
+                                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                                value={form.titleDeedType}
+                                                onChange={e => setForm({ ...form, titleDeedType: e.target.value as any })}
+                                            >
+                                                {DEED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
+                                            <input
+                                                type="checkbox"
+                                                id="paymentPlanSale"
+                                                checked={form.paymentPlanAvailable || false}
+                                                onChange={e => setForm({ ...form, paymentPlanAvailable: e.target.checked })}
+                                                className="w-5 h-5 text-green-600 rounded"
+                                            />
+                                            <label htmlFor="paymentPlanSale" className="text-sm font-bold text-green-900 cursor-pointer">
+                                                Payment Plan Available?
+                                            </label>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Payment Plan for Project */}
+                                {form.rentalType === 'project' && (
+                                    <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
+                                        <input
+                                            type="checkbox"
+                                            id="paymentPlan"
+                                            checked={form.paymentPlanAvailable || false}
+                                            onChange={e => setForm({ ...form, paymentPlanAvailable: e.target.checked })}
+                                            className="w-5 h-5 text-purple-600 rounded"
+                                        />
+                                        <label htmlFor="paymentPlan" className="text-sm font-bold text-purple-900 cursor-pointer">
+                                            Payment Plan Available?
+                                        </label>
+                                    </div>
+                                )}
+
+                                {/* District */}
+                                <div className={form.rentalType === 'short-term' || form.rentalType === 'project' ? '' : 'col-span-2'}>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">District</label>
+                                    <select
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                        value={form.location}
+                                        onChange={e => setForm({ ...form, location: e.target.value })}
+                                    >
+                                        {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                                    </select>
+                                </div>
+
+                                {/* Furnishing Status */}
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Furnishing Status</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {FURNISHING_STATUS.map(status => (
+                                            <div
+                                                key={status}
+                                                onClick={() => setForm({ ...form, furnishedStatus: status as any })}
+                                                className={`p-3 rounded-xl border cursor-pointer flex items-center justify-center transition-all ${
+                                                    form.furnishedStatus === status
+                                                        ? 'border-slate-900 bg-slate-900 text-white shadow-md'
+                                                        : 'border-slate-200 hover:border-slate-400 bg-white'
+                                                }`}
+                                            >
+                                                <span className="text-sm font-bold">{status}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Description */}
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
+                                    <textarea
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none h-32 resize-none"
+                                        value={form.description}
+                                        onChange={e => setForm({ ...form, description: e.target.value })}
+                                        placeholder="Describe the property features, location highlights, and unique selling points..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeFormTab === 'details' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2">Interior & Dimensions</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Bedrooms</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                        value={form.bedrooms}
+                                        onChange={e => setForm({ ...form, bedrooms: parseInt(e.target.value) })}
+                                        placeholder="3"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Bathrooms</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                        value={form.bathrooms}
+                                        onChange={e => setForm({ ...form, bathrooms: parseInt(e.target.value) })}
+                                        placeholder="2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Area (m²)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                        value={form.squareMeters}
+                                        onChange={e => setForm({ ...form, squareMeters: parseInt(e.target.value) })}
+                                        placeholder="120"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Plot Size (m²)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                        value={form.plotSize}
+                                        onChange={e => setForm({ ...form, plotSize: parseInt(e.target.value) })}
+                                        placeholder="250"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Build Year</label>
+                                    <select
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                        value={form.buildYear || new Date().getFullYear()}
+                                        onChange={e => setForm({ ...form, buildYear: parseInt(e.target.value) })}
+                                    >
+                                        <option value={new Date().getFullYear()}>Brand New ({new Date().getFullYear()})</option>
+                                        {Array.from({ length: 25 }, (_, i) => new Date().getFullYear() - i - 1).map(year => (
+                                            <option key={year} value={year}>{year}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+
+                    {activeFormTab === 'amenities' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2">Property Amenities</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {AMENITY_OPTIONS.map(amenity => {
+                                    const isSelected = form.amenities?.includes(amenity);
+                                    return (
+                                        <button
+                                            key={amenity}
+                                            onClick={() => {
+                                                const current = form.amenities || [];
+                                                setForm({
+                                                    ...form,
+                                                    amenities: isSelected
+                                                        ? current.filter((a: string) => a !== amenity)
+                                                        : [...current, amenity]
+                                                });
+                                            }}
+                                            className={`p-3 rounded-xl text-left text-sm font-medium border transition-all ${
+                                                isSelected
+                                                    ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                                                    isSelected ? 'border-white bg-white' : 'border-slate-300'
+                                                }`}>
+                                                    {isSelected && <div className="w-2 h-2 bg-slate-900 rounded-sm"></div>}
+                                                </div>
+                                                <span>{amenity}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                Selected: <span className="font-bold text-slate-900">{form.amenities?.length || 0}</span> amenities
+                            </p>
                         </div>
                     )}
 
@@ -571,7 +893,11 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({ isOpen, onClose, 
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Formatted Address</label>
-                                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl" value={form.placeName || form.location || ''} onChange={e => setForm({ ...form, placeName: e.target.value })} placeholder="Address / landmark" />
+                                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl" value={form.formattedAddress || form.placeName || form.location || ''} onChange={e => setForm({ ...form, formattedAddress: e.target.value })} placeholder="Address / landmark" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">District / Area</label>
+                                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl" value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g., Kyrenia, Catalkoy" />
                                     </div>
                                     <div className="bg-white border border-slate-200 px-6 py-3 rounded-xl shadow-sm text-sm text-slate-600 font-mono flex items-center justify-between">
                                         <span className="text-xs uppercase text-slate-400 font-bold">Pinned Coords</span>

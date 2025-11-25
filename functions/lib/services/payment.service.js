@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paymentService = void 0;
 const stripe_1 = __importDefault(require("stripe"));
+require("firebase-admin/firestore");
+const firestore_1 = require("firebase-admin/firestore");
 const firebase_1 = require("../config/firebase");
 const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || '', {
     apiVersion: '2025-11-17.clover', // Updated to match installed types
@@ -14,8 +16,10 @@ exports.paymentService = {
     createPaymentIntent: async (bookingId, userId) => {
         // Fetch booking to get the REAL price. Never trust the client.
         const bookingRef = firebase_1.db.collection('bookings').doc(bookingId);
+        console.log('[Payment] Fetching booking', bookingId);
         const bookingSnap = await bookingRef.get();
         if (!bookingSnap.exists) {
+            console.error('[Payment] Booking not found in Firestore:', bookingId);
             throw new Error('Booking not found');
         }
         const booking = bookingSnap.data();
@@ -65,7 +69,7 @@ exports.paymentService = {
                 status: 'confirmed',
                 paymentId: paymentIntent.id,
                 paymentStatus: 'paid',
-                updatedAt: new Date().toISOString()
+                updatedAt: firestore_1.FieldValue.serverTimestamp()
             });
         }
         return { received: true };

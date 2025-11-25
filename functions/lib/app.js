@@ -12,6 +12,7 @@ const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({ origin: true })); // Allow all origins for dev; restrict in prod
 app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: false })); // Needed for Twilio form posts
 // API Routes
 app.use('/v1', routes_1.default);
 // Health Check Endpoint (Essential for "God Mode" monitoring later)

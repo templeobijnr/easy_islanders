@@ -24,11 +24,12 @@ export const onListingWrite = onDocumentWritten(
         }
 
         // 2. Document Created or Updated
-        logger.info(`🔄 Syncing Listing ${listingId} to Search Index...`);
+        logger.info(`🔄 Syncing Listing ${listingId} to Search Index...`, { title: newDoc.title, domain: newDoc.domain, location: newDoc.location });
 
-        // Transform data for Search Engine (Flattening metadata)
+        // Transform data for Search Engine - pass all domain-specific fields
         const searchRecord = {
             id: listingId,
+            // Common fields
             title: newDoc.title,
             description: newDoc.description,
             price: newDoc.price,
@@ -38,10 +39,53 @@ export const onListingWrite = onDocumentWritten(
             location: newDoc.location,
             type: newDoc.type,
             rating: newDoc.rating,
-            ownerId: newDoc.ownerId,
-            // Flatten metadata for searchability (e.g., bedrooms becomes a top-level field)
-            metadata: newDoc.metadata,
-            createdAt: newDoc.createdAt
+            ownerId: newDoc.ownerId || newDoc.ownerUid,
+            createdAt: newDoc.createdAt,
+
+            // Real Estate fields
+            rentalType: newDoc.rentalType,
+            bedrooms: newDoc.bedrooms,
+            bathrooms: newDoc.bathrooms,
+            squareMeters: newDoc.squareMeters,
+            amenities: newDoc.amenities,
+
+            // Cars fields
+            make: newDoc.make,
+            model: newDoc.model,
+            year: newDoc.year,
+            transmission: newDoc.transmission,
+            fuelType: newDoc.fuelType,
+            seats: newDoc.seats,
+            mileage: newDoc.mileage,
+
+            // Hotels fields
+            hotelType: newDoc.hotelType,
+            stars: newDoc.stars,
+            breakfastIncluded: newDoc.breakfastIncluded,
+            roomTypes: newDoc.roomTypes,
+
+            // Restaurants fields
+            restaurantName: newDoc.restaurantName,
+            cuisine: newDoc.cuisine,
+            ingredients: newDoc.ingredients,
+
+            // Events fields
+            eventType: newDoc.eventType,
+            date: newDoc.date,
+            venue: newDoc.venue,
+            totalTickets: newDoc.totalTickets,
+            ticketsAvailable: newDoc.ticketsAvailable,
+
+            // Services fields
+            pricingModel: newDoc.pricingModel,
+            durationMinutes: newDoc.durationMinutes,
+            providerName: newDoc.providerName,
+            serviceArea: newDoc.serviceArea,
+
+            // Marketplace fields
+            condition: newDoc.condition,
+            stock: newDoc.stock,
+            sellerName: newDoc.sellerName
         };
 
         try {

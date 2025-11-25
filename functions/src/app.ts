@@ -9,6 +9,7 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: true })); // Allow all origins for dev; restrict in prod
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // Needed for Twilio form posts
 
 // API Routes
 app.use('/v1', router);

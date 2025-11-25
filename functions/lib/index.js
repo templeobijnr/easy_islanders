@@ -39,7 +39,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reindex = exports.stripeWebhook = exports.api = void 0;
+exports.testTypesense = exports.googlePlacesProxy = exports.populate = exports.reindex = exports.stripeWebhook = exports.api = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const dotenv = __importStar(require("dotenv"));
@@ -63,7 +63,47 @@ exports.stripeWebhook = (0, https_1.onRequest)({ region: "europe-west1", memory:
 });
 // 3. Database Triggers
 __exportStar(require("./triggers/onListingWrite"), exports);
+__exportStar(require("./triggers/intelligence.triggers"), exports);
+__exportStar(require("./triggers/taxi.triggers"), exports);
 // 4. Manual Reindex Endpoint
 const chat_controller_1 = require("./controllers/chat.controller");
-exports.reindex = (0, https_1.onRequest)({ region: "europe-west1", memory: "512MiB" }, chat_controller_1.reindexListings);
+exports.reindex = (0, https_1.onRequest)({ region: "europe-west1", memory: "512MiB", timeoutSeconds: 300 }, chat_controller_1.reindexListings);
+// 5. Database Population Endpoint
+const populate_controller_1 = require("./controllers/populate.controller");
+exports.populate = (0, https_1.onRequest)({ region: "europe-west1", memory: "1GiB", timeoutSeconds: 540 }, populate_controller_1.populateDatabase);
+// 6. Google Places Proxy (CORS-free)
+exports.googlePlacesProxy = (0, https_1.onRequest)({ region: "europe-west1", memory: "256MiB", cors: true }, async (req, res) => {
+    const { lat, lng, type, radius = 5000 } = req.query;
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+        res.status(500).json({ error: "Google Places API key not configured" });
+        return;
+    }
+    if (!lat || !lng) {
+        res.status(400).json({ error: "Missing lat/lng parameters" });
+        return;
+    }
+    try {
+        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type || 'restaurant'}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    }
+    catch (error) {
+        logger.error("Google Places API error:", error);
+        res.status(500).json({ error: "Failed to fetch places" });
+    }
+});
+// 7. Test Typesense Flow
+const testTypesenseFlow_1 = require("./scripts/testTypesenseFlow");
+exports.testTypesense = (0, https_1.onRequest)({ region: "europe-west1", memory: "512MiB", timeoutSeconds: 60 }, async (req, res) => {
+    try {
+        const result = await (0, testTypesenseFlow_1.testTypesenseFlow)();
+        res.json(result);
+    }
+    catch (error) {
+        logger.error('Test failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 //# sourceMappingURL=index.js.map

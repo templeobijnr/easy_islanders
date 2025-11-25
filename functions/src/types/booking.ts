@@ -29,6 +29,7 @@ export interface Booking {
   customerName: string; 
   customerContact?: string; 
   date: string; 
+  confirmationNumber?: string;
   
   status: 
     | 'payment_pending' 

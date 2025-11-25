@@ -24,23 +24,33 @@ type Step = 'intro' | 'domain_select' | 'sub_type' | 'details' | 'dashboard';
 type DashboardModule = 'overview' | 'listings' | 'crm' | 'inbox' | 'bookings' | 'marketing' | 'settings';
 
 // --- FORM TYPES & CONSTANTS ---
-type FormTab = 'essentials' | 'specs' | 'legal' | 'amenities' | 'media';
+type FormTab = 'essentials' | 'details' | 'location' | 'amenities' | 'media';
 
-const PROPERTY_TYPES = ['Villa', 'Apartment', 'Penthouse', 'Bungalow', 'Townhouse', 'Land', 'Commercial'];
-const RENTAL_TYPES = [
+const PROPERTY_TYPES = [
+  'Villa', 'Semi-Detached', 'Residence', 'Detached House', 'Timeshare',
+  'Unfinished Building', 'Flat', 'Penthouse', 'Bungalow', 'Complete Building'
+];
+
+const LISTING_TYPES = [
   { id: 'sale', label: 'For Sale' },
-  { id: 'short-term', label: 'Daily / Holiday' },
-  { id: 'long-term', label: 'Long Term Rental' },
+  { id: 'short-term', label: 'Short-Term Rental' },
+  { id: 'long-term', label: 'Long-Term Rental' },
   { id: 'project', label: 'Off-Plan Project' }
 ];
+
 const FURNISHING_STATUS = ['Unfurnished', 'Semi-Furnished', 'Fully Furnished'];
 const DEED_TYPES = ['Exchange Title', 'Turkish Title', 'TMD Title', 'Leasehold'];
+
 const AMENITY_OPTIONS = [
-  'Swimming Pool', 'Private Garden', 'Sea View', 'Mountain View', 'Garage', 
-  'Central Heating', 'Air Conditioning', 'Solar Panels', 'Fireplace', 
-  'Gated Community', 'Security 24/7', 'Gym', 'Generator', 'Smart Home',
-  'BBQ Area', 'Jacuzzi', 'Elevator', 'White Goods'
+  'Pool', 'Gym', 'Wi-Fi', 'Hot Tub', 'Air Conditioning', 'Sea View',
+  'Heating', 'TV', 'Mountain View', 'Kitchen', 'Spa', 'Microwave',
+  'Flat Screen TV', 'Shower', 'Sauna', 'Toilets', 'Linens',
+  'Private Garden', 'Garage', 'Solar Panels', 'Fireplace',
+  'Gated Community', 'Security 24/7', 'Generator', 'Smart Home',
+  'BBQ Area', 'Jacuzzi', 'Elevator', 'White Goods', 'Balcony',
+  'Terrace', 'Parking', 'Storage Room', 'Walk-in Closet'
 ];
+
 const LOCATIONS = ['Kyrenia (Girne)', 'Bellapais', 'Catalkoy', 'Esentepe', 'Lapta', 'Alsancak', 'Nicosia (Lefkosa)', 'Famagusta', 'Iskele', 'Bogaz'];
 
 const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
@@ -122,38 +132,54 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
   const handleImport = async () => {
     if (!importUrl) return;
     setIsImporting(true);
-    
-    const data = await importPropertyFromUrl(importUrl);
-    
-    if (data) {
-      // Check if we got images
-      let importedImages = data.images || [];
-      // Fallback logic if no images array but we have an imageUrl? 
-      // Usually scraping provides array.
 
-      setNewProperty(prev => ({
-        ...prev,
-        title: data.title || prev.title,
-        description: data.description || prev.description,
-        price: data.price || prev.price,
-        currency: data.currency || 'GBP',
-        location: data.location || prev.location,
-        bedrooms: data.bedrooms || prev.bedrooms,
-        bathrooms: data.bathrooms || prev.bathrooms,
-        category: data.category || prev.category,
-        images: [...(prev.images || []), ...importedImages],
-        imageUrl: importedImages.length > 0 ? importedImages[0] : prev.imageUrl
-      }));
-      
-      // Jump to media tab if images found so user can see them
-      if (importedImages.length > 0) {
+    try {
+      const data = await importPropertyFromUrl(importUrl);
+
+      if (data) {
+        // Check if we got images
+        let importedImages = data.images || [];
+
+        // Build updated property with all imported fields
+        setNewProperty(prev => ({
+          ...prev,
+          title: data.title || prev.title,
+          description: data.description || prev.description,
+          price: data.price || prev.price,
+          currency: data.currency || prev.currency || 'GBP',
+          location: data.location || prev.location,
+          bedrooms: data.bedrooms || prev.bedrooms,
+          bathrooms: data.bathrooms || prev.bathrooms,
+          squareMeters: data.squareMeters || prev.squareMeters,
+          plotSize: data.plotSize || prev.plotSize,
+          category: data.category || prev.category,
+          rentalType: data.rentalType || prev.rentalType,
+          amenities: data.amenities && data.amenities.length > 0 ? data.amenities : prev.amenities,
+          images: [...(prev.images || []), ...importedImages],
+          imageUrl: importedImages.length > 0 ? importedImages[0] : prev.imageUrl
+        }));
+
+        // Show success message
+        const fieldCount = [
+          data.title, data.description, data.price, data.location,
+          data.bedrooms, data.bathrooms, data.squareMeters
+        ].filter(Boolean).length;
+
+        console.log(`✅ Auto-filled ${fieldCount} fields and ${importedImages.length} images`);
+
+        // Jump to media tab if images found so user can see them
+        if (importedImages.length > 0) {
           setActiveFormTab('media');
-      }
+        }
 
-    } else {
-      alert("Could not extract details automatically. Please ensure the URL is valid or fill details manually.");
+      } else {
+        alert("Could not extract details automatically. Please ensure the URL is valid or fill details manually.");
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert("Failed to import listing. Please try again or fill details manually.");
     }
-    
+
     setIsImporting(false);
   };
 
@@ -519,8 +545,8 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                {/* Tab Navigation */}
                <div className="px-6 pt-4 bg-white border-b border-slate-100 flex items-end gap-2 overflow-x-auto scrollbar-hide">
                   {renderTabButton('essentials', 'Essentials', Layers)}
-                  {renderTabButton('specs', 'Specifications', Ruler)}
-                  {renderTabButton('legal', 'Legal & Status', FileText)}
+                  {renderTabButton('details', 'Property Details', Ruler)}
+                  {renderTabButton('location', 'Location', MapPin)}
                   {renderTabButton('amenities', 'Amenities', List)}
                   {renderTabButton('media', 'Media', ImageIcon)}
                </div>
@@ -533,31 +559,22 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                      {activeFormTab === 'essentials' && (
                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             {/* Property Title */}
                              <div className="col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Property Title</label>
-                                <input 
-                                   type="text" 
+                                <input
+                                   type="text"
                                    value={newProperty.title}
                                    onChange={e => setNewProperty({...newProperty, title: e.target.value})}
-                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none font-medium" 
+                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none font-medium"
                                    placeholder="e.g. Luxury Villa with Infinity Pool"
                                 />
                              </div>
 
-                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Market Status</label>
-                                <select 
-                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                                  value={newProperty.rentalType}
-                                  onChange={e => setNewProperty({...newProperty, rentalType: e.target.value as any})}
-                                >
-                                   {RENTAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                </select>
-                             </div>
-
+                             {/* Property Type */}
                              <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Property Type</label>
-                                <select 
+                                <select
                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                                   value={newProperty.category}
                                   onChange={e => setNewProperty({...newProperty, category: e.target.value})}
@@ -566,22 +583,132 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                                 </select>
                              </div>
 
+                             {/* Listing Type */}
                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Price</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Listing Type</label>
+                                <select
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                  value={newProperty.rentalType}
+                                  onChange={e => setNewProperty({...newProperty, rentalType: e.target.value as any})}
+                                >
+                                   {LISTING_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                </select>
+                             </div>
+
+                             {/* Dynamic Price Field */}
+                             <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                   {newProperty.rentalType === 'short-term' && 'Daily Price'}
+                                   {newProperty.rentalType === 'long-term' && 'Monthly Price'}
+                                   {newProperty.rentalType === 'sale' && 'Sales Price'}
+                                   {newProperty.rentalType === 'project' && 'Project Price'}
+                                </label>
                                 <div className="relative">
                                    <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
-                                   <input 
-                                      type="number" 
+                                   <input
+                                      type="number"
                                       value={newProperty.price}
                                       onChange={e => setNewProperty({...newProperty, price: parseInt(e.target.value)})}
-                                      className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-bold" 
+                                      className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-bold"
                                    />
                                 </div>
                              </div>
 
+                             {/* Deposit & Cleaning Fee for Short-term */}
+                             {newProperty.rentalType === 'short-term' && (
+                                <>
+                                   <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                                      <input
+                                         type="checkbox"
+                                         id="depositNeeded"
+                                         checked={newProperty.depositNeeded || false}
+                                         onChange={e => setNewProperty({...newProperty, depositNeeded: e.target.checked})}
+                                         className="w-5 h-5 text-blue-600 rounded"
+                                      />
+                                      <label htmlFor="depositNeeded" className="text-sm font-bold text-blue-900 cursor-pointer">
+                                         Deposit Required?
+                                      </label>
+                                   </div>
+                                   <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cleaning Fee</label>
+                                      <div className="relative">
+                                         <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
+                                         <input
+                                            type="number"
+                                            value={newProperty.cleaningFee || 0}
+                                            onChange={e => setNewProperty({...newProperty, cleaningFee: parseInt(e.target.value)})}
+                                            className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                            placeholder="0"
+                                         />
+                                      </div>
+                                   </div>
+                                </>
+                             )}
+
+                             {/* Monthly Deposit for Long-term */}
+                             {newProperty.rentalType === 'long-term' && (
+                                <div>
+                                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Monthly Deposit Needed</label>
+                                   <div className="relative">
+                                      <span className="absolute left-4 top-3.5 text-slate-400 font-bold">£</span>
+                                      <input
+                                         type="number"
+                                         value={newProperty.monthlyDeposit || 0}
+                                         onChange={e => setNewProperty({...newProperty, monthlyDeposit: parseInt(e.target.value)})}
+                                         className="w-full pl-8 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                      />
+                                   </div>
+                                </div>
+                             )}
+
+                             {/* Title Deed & Payment Plan for Sale */}
+                             {newProperty.rentalType === 'sale' && (
+                                <>
+                                   <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Title Deed Type</label>
+                                      <select
+                                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                         value={newProperty.titleDeedType}
+                                         onChange={e => setNewProperty({...newProperty, titleDeedType: e.target.value as any})}
+                                      >
+                                         {DEED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                      </select>
+                                   </div>
+                                   <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
+                                      <input
+                                         type="checkbox"
+                                         id="paymentPlanSale"
+                                         checked={newProperty.paymentPlanAvailable || false}
+                                         onChange={e => setNewProperty({...newProperty, paymentPlanAvailable: e.target.checked})}
+                                         className="w-5 h-5 text-green-600 rounded"
+                                      />
+                                      <label htmlFor="paymentPlanSale" className="text-sm font-bold text-green-900 cursor-pointer">
+                                         Payment Plan Available?
+                                      </label>
+                                   </div>
+                                </>
+                             )}
+
+                             {/* Payment Plan for Project */}
+                             {newProperty.rentalType === 'project' && (
+                                <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
+                                   <input
+                                      type="checkbox"
+                                      id="paymentPlan"
+                                      checked={newProperty.paymentPlanAvailable || false}
+                                      onChange={e => setNewProperty({...newProperty, paymentPlanAvailable: e.target.checked})}
+                                      className="w-5 h-5 text-purple-600 rounded"
+                                   />
+                                   <label htmlFor="paymentPlan" className="text-sm font-bold text-purple-900 cursor-pointer">
+                                      Payment Plan Available?
+                                   </label>
+                                </div>
+                             )}
+
+                             {/* District */}
                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Location</label>
-                                <select 
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">District</label>
+                                <select
                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                                   value={newProperty.location}
                                   onChange={e => setNewProperty({...newProperty, location: e.target.value})}
@@ -590,13 +717,32 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                                 </select>
                              </div>
 
+                             {/* Furnishing Status */}
+                             <div className="col-span-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Furnishing Status</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                   {FURNISHING_STATUS.map(status => (
+                                      <div
+                                         key={status}
+                                         onClick={() => setNewProperty({...newProperty, furnishedStatus: status as any})}
+                                         className={`p-3 rounded-xl border cursor-pointer flex items-center justify-center transition-all ${
+                                            newProperty.furnishedStatus === status ? 'border-slate-900 bg-slate-900 text-white shadow-md' : 'border-slate-200 hover:border-slate-400'
+                                         }`}
+                                      >
+                                         <span className="text-sm font-bold">{status}</span>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+
+                             {/* Description */}
                              <div className="col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
-                                <textarea 
+                                <textarea
                                    rows={5}
                                    value={newProperty.description}
                                    onChange={e => setNewProperty({...newProperty, description: e.target.value})}
-                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" 
+                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                                    placeholder="Describe the property highlights..."
                                 />
                              </div>
@@ -604,8 +750,8 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                        </div>
                      )}
 
-                     {/* TAB 2: SPECIFICATIONS */}
-                     {activeFormTab === 'specs' && (
+                     {/* TAB 2: PROPERTY DETAILS */}
+                     {activeFormTab === 'details' && (
                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
                           <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2">Interior & Dimensions</h4>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -617,7 +763,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                                    <button onClick={() => setNewProperty({...newProperty, bedrooms: (newProperty.bedrooms || 0) + 1})} className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center text-teal-600 hover:bg-teal-50"><Plus size={14}/></button>
                                 </div>
                              </div>
-                             
+
                              <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Bathrooms</label>
                                 <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
@@ -637,70 +783,63 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                              </div>
 
                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Closed Area (m²)</label>
-                                <input 
-                                   type="number" 
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Area (m²)</label>
+                                <input
+                                   type="number"
                                    value={newProperty.squareMeters}
                                    onChange={e => setNewProperty({...newProperty, squareMeters: parseInt(e.target.value)})}
-                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono" 
+                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                   placeholder="120"
                                 />
                              </div>
-                             
+
                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Total Plot (m²)</label>
-                                <input 
-                                   type="number" 
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Plot Size (m²)</label>
+                                <input
+                                   type="number"
                                    value={newProperty.plotSize}
                                    onChange={e => setNewProperty({...newProperty, plotSize: parseInt(e.target.value)})}
-                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono" 
+                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono"
+                                   placeholder="250"
                                 />
                              </div>
 
                              <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Build Year</label>
-                                <input 
-                                   type="number" 
-                                   value={newProperty.buildYear}
+                                <select
+                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                   value={newProperty.buildYear || new Date().getFullYear()}
                                    onChange={e => setNewProperty({...newProperty, buildYear: parseInt(e.target.value)})}
-                                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono" 
-                                />
+                                >
+                                   <option value={new Date().getFullYear()}>Brand New ({new Date().getFullYear()})</option>
+                                   {Array.from({ length: 25 }, (_, i) => new Date().getFullYear() - i - 1).map(year => (
+                                      <option key={year} value={year}>{year}</option>
+                                   ))}
+                                </select>
                              </div>
                           </div>
                        </div>
                      )}
 
-                     {/* TAB 3: LEGAL */}
-                     {activeFormTab === 'legal' && (
+                     {/* TAB 3: LOCATION */}
+                     {activeFormTab === 'location' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div>
-                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Furnishing Status</label>
-                                 <div className="space-y-2">
-                                    {FURNISHING_STATUS.map(status => (
-                                       <div 
-                                          key={status}
-                                          onClick={() => setNewProperty({...newProperty, furnishedStatus: status as any})}
-                                          className={`p-3 rounded-xl border cursor-pointer flex items-center justify-between transition-all ${
-                                             newProperty.furnishedStatus === status ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-teal-200'
-                                          }`}
-                                       >
-                                          <span className="text-sm font-medium">{status}</span>
-                                          {newProperty.furnishedStatus === status && <Check size={16} className="text-teal-600" />}
-                                       </div>
-                                    ))}
-                                 </div>
-                              </div>
-
-                              <div>
-                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Title Deed Type</label>
-                                 <select 
+                           <div className="text-center py-12">
+                              <MapPin size={48} className="mx-auto text-slate-300 mb-4" />
+                              <h4 className="font-bold text-slate-900 mb-2">Enhanced Location Search</h4>
+                              <p className="text-slate-500 mb-6">More dynamic location features coming soon</p>
+                              <div className="max-w-md mx-auto">
+                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2 text-left">Current District</label>
+                                 <select
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                                    value={newProperty.titleDeedType}
-                                    onChange={e => setNewProperty({...newProperty, titleDeedType: e.target.value as any})}
+                                    value={newProperty.location}
+                                    onChange={e => setNewProperty({...newProperty, location: e.target.value})}
                                  >
-                                    {DEED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    {LOCATIONS.map(t => <option key={t} value={t}>{t}</option>)}
                                  </select>
-                                 <p className="text-[10px] text-slate-400 mt-2">Specify the legal status of the land.</p>
+                                 <p className="text-xs text-slate-400 mt-2 text-left">
+                                    Map integration and address autocomplete will be added in the next update
+                                 </p>
                               </div>
                            </div>
                         </div>
@@ -820,12 +959,12 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                   <button onClick={() => setIsAddModalOpen(false)} className="font-bold text-slate-500 hover:text-slate-800 px-4">Cancel</button>
                   <div className="flex gap-3">
                       {activeFormTab !== 'essentials' && (
-                         <button 
+                         <button
                            onClick={() => {
                               if (activeFormTab === 'media') setActiveFormTab('amenities');
-                              if (activeFormTab === 'amenities') setActiveFormTab('legal');
-                              if (activeFormTab === 'legal') setActiveFormTab('specs');
-                              if (activeFormTab === 'specs') setActiveFormTab('essentials');
+                              if (activeFormTab === 'amenities') setActiveFormTab('location');
+                              if (activeFormTab === 'location') setActiveFormTab('details');
+                              if (activeFormTab === 'details') setActiveFormTab('essentials');
                            }}
                            className="px-6 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50"
                          >
@@ -833,11 +972,11 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                          </button>
                       )}
                       {activeFormTab !== 'media' ? (
-                         <button 
+                         <button
                            onClick={() => {
-                              if (activeFormTab === 'essentials') setActiveFormTab('specs');
-                              if (activeFormTab === 'specs') setActiveFormTab('legal');
-                              if (activeFormTab === 'legal') setActiveFormTab('amenities');
+                              if (activeFormTab === 'essentials') setActiveFormTab('details');
+                              if (activeFormTab === 'details') setActiveFormTab('location');
+                              if (activeFormTab === 'location') setActiveFormTab('amenities');
                               if (activeFormTab === 'amenities') setActiveFormTab('media');
                            }}
                            className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 flex items-center gap-2 shadow-lg"
@@ -845,7 +984,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ onExit }) => {
                             Next Step <ArrowRight size={18} />
                          </button>
                       ) : (
-                         <button 
+                         <button
                             onClick={handleSaveProperty}
                             disabled={isSaving || !newProperty.title}
                             className="px-8 py-3 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 flex items-center gap-2 shadow-lg shadow-teal-500/30 disabled:opacity-50 disabled:shadow-none"

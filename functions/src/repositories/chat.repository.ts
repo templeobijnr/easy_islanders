@@ -49,13 +49,15 @@ export const chatRepository = {
 
     // 3. Save Message
     // We allow saving 'parts' array directly to support Tool Calls in the future
-    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[]) => {
+    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string }) => {
         await db.collection('chatSessions')
             .doc(sessionId)
             .collection('messages')
             .add({
                 role,
                 parts,
+                userId: meta?.userId || null,
+                agentId: meta?.agentId || null,
                 timestamp: new Date().toISOString()
             });
 

@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -11,9 +13,11 @@ export const paymentService = {
     createPaymentIntent: async (bookingId: string, userId: string) => {
         // Fetch booking to get the REAL price. Never trust the client.
         const bookingRef = db.collection('bookings').doc(bookingId);
+        console.log('[Payment] Fetching booking', bookingId);
         const bookingSnap = await bookingRef.get();
 
         if (!bookingSnap.exists) {
+            console.error('[Payment] Booking not found in Firestore:', bookingId);
             throw new Error('Booking not found');
         }
 
@@ -72,7 +76,7 @@ export const paymentService = {
                 status: 'confirmed',
                 paymentId: paymentIntent.id,
                 paymentStatus: 'paid',
-                updatedAt: new Date().toISOString()
+                updatedAt: FieldValue.serverTimestamp()
             });
         }
 

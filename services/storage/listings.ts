@@ -2,6 +2,7 @@
 import { db } from '../firebaseConfig';
 import { collection, getDocs, doc, setDoc, updateDoc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { UnifiedItem } from '../../types';
+import { ALL_MOCK_ITEMS } from '../../constants';
 import { sanitizeData } from './utils';
 
 const COLLECTION = 'listings';
@@ -29,11 +30,17 @@ export const ListingsStorage = {
       }
 
       const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) return []; 
-      return querySnapshot.docs.map(doc => doc.data() as UnifiedItem);
+      if (querySnapshot.empty) {
+        console.warn("[ListingsStorage] No listings found in Firestore, falling back to mock data.");
+        return ALL_MOCK_ITEMS as any as UnifiedItem[];
+      }
+      const docs = querySnapshot.docs.map(doc => doc.data() as UnifiedItem);
+      console.log(`[ListingsStorage] Fetched ${docs.length} listings from Firestore`);
+      return docs;
     } catch (error) {
       console.error("Error fetching listings:", error);
-      return [];
+      console.warn("[ListingsStorage] Falling back to mock listings.");
+      return ALL_MOCK_ITEMS as any as UnifiedItem[];
     }
   },
 

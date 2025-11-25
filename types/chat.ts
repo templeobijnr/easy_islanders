@@ -8,7 +8,12 @@ export interface Message {
   text: string;
   timestamp: Date;
   recommendedItems?: UnifiedItem[];
-  booking?: Booking; 
-  paymentRequest?: boolean; 
-  whatsappTriggered?: boolean; 
+  booking?: Booking;
+  paymentRequest?: boolean;
+  whatsappTriggered?: boolean;
+  mapLocation?: {
+    lat: number;
+    lng: number;
+    title: string;
+  };
 }

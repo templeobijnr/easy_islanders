@@ -22,6 +22,7 @@ export interface SocialUser {
 
   // Enhanced discovery fields
   currentLocation?: string;
+  coordinates?: { lat: number; lng: number };
   currentMood?: string;
   languages?: string[];
   passportStamps: PassportStamp[];

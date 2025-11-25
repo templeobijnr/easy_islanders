@@ -11,8 +11,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // ✅ Only expose safe, public environment variables
+        // VITE_ prefixed variables are automatically available via import.meta.env
+        // No need to manually define them here unless you need custom names
       },
       resolve: {
         alias: {
