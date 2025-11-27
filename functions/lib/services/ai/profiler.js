@@ -9,7 +9,7 @@ async function analyzeChatTurn(userId, lastMessage, currentGraph) {
     console.log(`[Profiler] Analyzing message for user ${userId}:`, lastMessage);
     console.log(`[Profiler] Current graph:`, JSON.stringify(currentGraph).substring(0, 400));
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-lite',
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
         systemInstruction: `
         You are an expert profiler. Analyze the latest user message and update a user intelligence graph.
         Output strict JSON with: { attributes: {}, segments: [], missingData: [] }.
@@ -17,7 +17,7 @@ async function analyzeChatTurn(userId, lastMessage, currentGraph) {
         Missing data keys to consider: BUDGET, TRANSPORT, ACCOMMODATION, LOCATION, TIMELINE.
         Do NOT include prose; JSON only.
         `
-    }, { apiVersion: 'v1' });
+    }, { apiVersion: 'v1beta' });
     const prompt = `
     USER_ID: ${userId}
     CURRENT_GRAPH: ${JSON.stringify(currentGraph || {})}

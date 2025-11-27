@@ -1,7 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { UserIntelligence } from '../../types/user';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.error('❌ GEMINI_API_KEY is not configured. User profiling will be disabled.');
+}
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 export async function analyzeChatTurn(userId: string, lastMessage: string, currentGraph: UserIntelligence): Promise<UserIntelligence> {
     if (!lastMessage || !genAI) return currentGraph;
@@ -10,7 +14,7 @@ export async function analyzeChatTurn(userId: string, lastMessage: string, curre
     console.log(`[Profiler] Current graph:`, JSON.stringify(currentGraph).substring(0, 400));
 
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-lite',
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
         systemInstruction: `
         You are an expert profiler. Analyze the latest user message and update a user intelligence graph.
         Output strict JSON with: { attributes: {}, segments: [], missingData: [] }.
@@ -18,7 +22,7 @@ export async function analyzeChatTurn(userId: string, lastMessage: string, curre
         Missing data keys to consider: BUDGET, TRANSPORT, ACCOMMODATION, LOCATION, TIMELINE.
         Do NOT include prose; JSON only.
         `
-    }, { apiVersion: 'v1' });
+    }, { apiVersion: 'v1beta' });
 
     const prompt = `
     USER_ID: ${userId}

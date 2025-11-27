@@ -5,7 +5,6 @@ import * as typesenseService from "../services/typesense.service";
 export const onListingWrite = onDocumentWritten(
     {
         document: "listings/{listingId}",
-        database: "easy-db",
         region: "europe-west1"
     },
     async (event) => {

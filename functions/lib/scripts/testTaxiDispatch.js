@@ -24,8 +24,7 @@ async function testTaxiDispatch() {
             destination: 'Bellapais Abbey',
             pickupLat: 35.3369,
             pickupLng: 33.3249,
-            destinationLat: 35.3086,
-            destinationLng: 33.3640,
+            // Note: destinationLat/Lng removed - not needed in new system
             customerContact: 'whatsapp:+905488639394', // Your test number
             customerName: 'City OS Test User',
             notes: 'This is a test dispatch from City OS'

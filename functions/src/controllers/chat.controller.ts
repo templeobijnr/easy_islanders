@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, FunctionCallingMode } from '@google/generative-ai';
 import { ALL_TOOL_DEFINITIONS } from '../utils/agentTools';
 import { toolResolvers } from '../services/toolService';
 import { chatRepository } from '../repositories/chat.repository';
@@ -8,7 +8,11 @@ import { db } from '../config/firebase';
 import { getLiteContext } from '../services/user.service';
 
 // Initialize Gemini with API Key from environment variables
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.error('❌ GEMINI_API_KEY is not configured. Chat functionality will fail.');
+}
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
 
 import { getSystemInstruction } from '../utils/systemPrompts';
 
@@ -108,7 +112,13 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             - Use the user's name (${userName}) naturally for a more personal tone when appropriate.
             - If user is already on-island / mobile / has_car / declined pickup, do not upsell airport pickup. Prefer in-island services instead.
             - Be date-aware: convert vague ranges like "next week Thursday to the following Friday" to concrete dates using current time (${timeString}). Avoid re-asking if you can compute dates.
-            - If you have a pickup (user shared location or specified) AND a destination, CALL the dispatchTaxi tool immediately. Do not reply with text instead of calling the tool.
+
+            [CRITICAL - TAXI TOOL USAGE]
+            - When you have BOTH a pickup location AND a destination, you MUST call the dispatchTaxi function
+            - DO NOT say "I'm dispatching a taxi" or "I'll send a taxi" - ACTUALLY CALL THE TOOL
+            - DO NOT respond with text when you should call dispatchTaxi
+            - ALWAYS use function calls instead of describing what you're doing
+            - If pickup location is "Current location" or user shared location, use the coordinates provided below
 
             [LOCATION HANDLING - CRITICAL]
             - NEVER ask users for "latitude", "longitude", "GPS coordinates", or any technical location data
@@ -122,11 +132,21 @@ export const handleChatMessage = async (req: Request, res: Response) => {
         console.log('🟦 [Backend] Initializing Gemini...');
 
         // 3. Initialize Model with History
+        // Use v1beta API for experimental models with tool support
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+        console.log(`🤖 Using model: ${modelName}`);
+        console.log(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
+
         const model = genAI.getGenerativeModel(
             {
-                model: 'gemini-2.0-flash-exp',
+                model: modelName,
                 systemInstruction: contextPrompt,
-                tools: [{ functionDeclarations: ALL_TOOL_DEFINITIONS }]
+                tools: [{ functionDeclarations: ALL_TOOL_DEFINITIONS }],
+                toolConfig: {
+                    functionCallingConfig: {
+                        mode: FunctionCallingMode.AUTO // Allow model to choose when to call functions
+                    }
+                }
             },
             { apiVersion: 'v1beta' }
         );
@@ -156,6 +176,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
         let payment = null;
         let viewingRequest = null;
         let mapLocation = null;
+        let taxiRequestId: string | null = null;
 
         // Loop while there are function calls
         let functionCalls = response.functionCalls();
@@ -197,30 +218,30 @@ export const handleChatMessage = async (req: Request, res: Response) => {
                         toolResult = { results: simplifiedItems, count: simplifiedItems.length };
                     }
                     else if (fnName === 'initiateBooking') {
-                        const res = await toolResolvers.createBooking(fnArgs, user.uid);
+                        const res = await toolResolvers.createBooking(fnArgs as any, user.uid);
                         booking = res; // Store full booking for frontend
                         toolResult = { success: true, bookingId: res.id, receipt: res.receipt };
                     }
                     else if (fnName === 'createPaymentIntent') {
-                        const res = await toolResolvers.createPaymentIntent(fnArgs, user.uid);
+                        const res = await toolResolvers.createPaymentIntent(fnArgs as any, user.uid);
                         payment = res.payment;
                         toolResult = res;
                     }
                     else if (fnName === 'scheduleViewing') {
-                        const res = await toolResolvers.scheduleViewing(fnArgs, user.uid);
+                        const res = await toolResolvers.scheduleViewing(fnArgs as any, user.uid);
                         viewingRequest = res;
                         toolResult = res;
                     }
                     else if (fnName === 'consultEncyclopedia') {
-                        toolResult = await toolResolvers.consultEncyclopedia(fnArgs);
+                        toolResult = await toolResolvers.consultEncyclopedia(fnArgs as any);
                     }
                     else if (fnName === 'getRealTimeInfo') {
-                        toolResult = await toolResolvers.getRealTimeInfo(fnArgs);
+                        toolResult = await toolResolvers.getRealTimeInfo(fnArgs as any);
                     }
                     else if (fnName === 'sendWhatsAppMessage') {
-                        toolResult = await toolResolvers.sendWhatsAppMessage(fnArgs);
+                        toolResult = await toolResolvers.sendWhatsAppMessage(fnArgs as any);
                     }
-                    else if (fnName === 'dispatchTaxi') {
+                    else if (fnName === 'dispatchTaxi' || fnName === 'requestTaxi') {
                         // Auto-inject user location (current or last known) if available
                         const enrichedArgs: any = { ...fnArgs };
                         const locationForTaxi = effectiveLocation || userLocation;
@@ -228,7 +249,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
                         if (locationForTaxi && !enrichedArgs.pickupLat && !enrichedArgs.pickupLng) {
                             enrichedArgs.pickupLat = locationForTaxi.lat;
                             enrichedArgs.pickupLng = locationForTaxi.lng;
-                            console.log('📍 [Backend] Auto-injected user location into dispatchTaxi:', locationForTaxi);
+                            console.log(`📍 [Backend] Auto-injected user location into ${fnName}:`, locationForTaxi);
                         }
 
                         // If pickupLocation is missing or too generic, label it clearly for the driver
@@ -236,19 +257,26 @@ export const handleChatMessage = async (req: Request, res: Response) => {
                             enrichedArgs.pickupLocation = 'Current location (see map link)';
                         }
 
-                        toolResult = await toolResolvers.dispatchTaxi(enrichedArgs, user.uid);
+                        const resolver = fnName === 'dispatchTaxi' ? toolResolvers.dispatchTaxi : (toolResolvers as any).requestTaxi;
+                        toolResult = await resolver(enrichedArgs, user.uid, sessionId);
+
+                        // Capture requestId for frontend tracking
+                        if (toolResult.success && toolResult.requestId) {
+                            taxiRequestId = toolResult.requestId;
+                            console.log(`🚕 [Backend] Captured taxi requestId: ${taxiRequestId}`);
+                        }
                     }
                     else if (fnName === 'orderHouseholdSupplies') {
-                        toolResult = await toolResolvers.orderHouseholdSupplies(fnArgs, user.uid);
+                        toolResult = await (toolResolvers as any).orderHouseholdSupplies(fnArgs as any, user.uid);
                     }
                     else if (fnName === 'requestService') {
-                        toolResult = await toolResolvers.requestService(fnArgs, user.uid);
+                        toolResult = await (toolResolvers as any).requestService(fnArgs as any, user.uid);
                     }
                     else if (fnName === 'createConsumerRequest') {
-                        toolResult = await toolResolvers.createConsumerRequest(fnArgs);
+                        toolResult = await toolResolvers.createConsumerRequest(fnArgs as any);
                     }
                     else if (fnName === 'showMap') {
-                        toolResult = await toolResolvers.showMap(fnArgs);
+                        toolResult = await (toolResolvers as any).showMap(fnArgs as any);
                         // Store map location for frontend response
                         mapLocation = toolResult;
                     }
@@ -333,9 +361,16 @@ export const handleChatMessage = async (req: Request, res: Response) => {
         }
 
         // 6. Persistence (Save both sides)
+        const modelMessageMeta: any = { userId: user.uid, agentId };
+
+        // Add taxi requestId to metadata for frontend tracking
+        if (taxiRequestId) {
+            modelMessageMeta.taxiRequestId = taxiRequestId;
+        }
+
         await Promise.all([
             chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId }),
-            chatRepository.saveMessage(sessionId, 'model', [{ text: text }], { userId: user.uid, agentId })
+            chatRepository.saveMessage(sessionId, 'model', [{ text: text }], modelMessageMeta)
         ]);
 
         console.log('📤 [Backend] Sending response. Has mapLocation?', !!mapLocation, mapLocation);

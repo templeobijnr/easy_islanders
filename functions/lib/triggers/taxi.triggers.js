@@ -32,6 +32,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkTaxiRequestTimeouts = void 0;
 const functions = __importStar(require("firebase-functions"));
@@ -88,4 +91,6 @@ async function alertOpsTeam(message: string): Promise<void> {
   console.log(`OPS ALERT: ${message}`);
 }
 */
+// Export the status change trigger
+__exportStar(require("./taxi-status.trigger"), exports);
 //# sourceMappingURL=taxi.triggers.js.map

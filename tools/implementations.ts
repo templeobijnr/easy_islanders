@@ -1,4 +1,20 @@
 
+/**
+ * Frontend‑side implementations for "tools" used by the local
+ * agent experience (when running without the full backend).
+ *
+ * These functions:
+ *  - operate on UnifiedItem data from StorageService
+ *  - mimic what the real backend + tools do (search, booking,
+ *    taxi dispatch, encyclopedia lookups, etc.)
+ *  - are safe to use in Storybook / local dev or as a fallback
+ *    when the Functions API is not available.
+ *
+ * Production flows should go through the Firebase Functions
+ * tool resolvers; these implementations are primarily for
+ * prototyping and offline behaviour.
+ */
+
 import { UnifiedItem, Booking, Listing, HotelItem, Vehicle } from "../types";
 import { StorageService } from "../services/storageService";
 import { ISLAND_KNOWLEDGE_BASE, MOCK_REALTIME_DATA } from "../services/knowledgeBase";
@@ -10,6 +26,10 @@ const getAllUnifiedItems = async (): Promise<UnifiedItem[]> => {
 
 // --- IMPLEMENTATIONS ---
 
+/**
+ * Local search implementation that mirrors the behaviour of
+ * the backend `searchMarketplace` tool using in‑memory items.
+ */
 export const executeSearch = async (args: any): Promise<UnifiedItem[]> => {
   console.log("Executing Search Tool:", args);
   const allItems = await getAllUnifiedItems();
@@ -89,6 +109,13 @@ export const executeSearch = async (args: any): Promise<UnifiedItem[]> => {
   return results;
 };
 
+/**
+ * Create a local booking object for an item and decide whether
+ * the UI should show a payment step.
+ *
+ * In production this is backed by Firestore + Stripe; here we
+ * just create a client‑side Booking instance.
+ */
 export const executeBooking = async (args: any): Promise<{ booking: Booking, requiresPayment: boolean }> => {
   const allItems = await getAllUnifiedItems();
   const item = allItems.find(i => i.id === args.itemId);
@@ -131,12 +158,20 @@ export const executeBooking = async (args: any): Promise<{ booking: Booking, req
   };
 };
 
+/**
+ * Simulated WhatsApp side‑effect used by the UI to show that a
+ * message was "sent" without actually calling Twilio.
+ */
 export const executeWhatsApp = async (args: any) => {
   // Simulate API latency
   await new Promise(resolve => setTimeout(resolve, 1000));
   return { status: 'sent', delivered: true, timestamp: new Date().toISOString() };
 };
 
+/**
+ * Resolve static island knowledge articles for topics like
+ * residency, utilities, emergency numbers etc.
+ */
 export const executeEncyclopedia = async (args: any) => {
   console.log("Consulting Encyclopedia for:", args.topic);
   const topicData = (ISLAND_KNOWLEDGE_BASE as any)[args.topic];
@@ -146,12 +181,20 @@ export const executeEncyclopedia = async (args: any) => {
   return { content: "Information not found in the local knowledge base." };
 };
 
+/**
+ * Return mock realtime data such as weather or FX rates.
+ * In production this is handled by backend integrations.
+ */
 export const executeRealTimeInfo = async (args: any) => {
   console.log("Fetching Real Time Info:", args.category);
   const data = (MOCK_REALTIME_DATA as any)[args.category];
   return data || { error: "Real-time data unavailable" };
 };
 
+/**
+ * Simulate a taxi dispatch by assigning a mock driver and ETA,
+ * then saving a Booking object to local storage.
+ */
 export const executeTaxiDispatch = async (args: any): Promise<{ booking: Booking }> => {
   // Simulate Dispatch Logic
   const drivers = [
@@ -185,6 +228,12 @@ export const executeTaxiDispatch = async (args: any): Promise<{ booking: Booking
   };
 };
 
+/**
+ * Create a local "consumer request" when no marketplace supply
+ * matches the user's needs (e.g. special requests or future
+ * flows). In production this would write to Firestore so
+ * businesses can respond.
+ */
 export const executeCreateConsumerRequest = async (args: any) => {
   console.log("Creating Consumer Request:", args);
   const req = {

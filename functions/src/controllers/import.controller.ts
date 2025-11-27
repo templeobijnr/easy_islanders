@@ -208,8 +208,8 @@ export const importPropertyFromUrl = async (req: Request, res: Response) => {
       console.log('🤖 [AI] Enhancing with Gemini...');
 
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp'
-      });
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+      }, { apiVersion: 'v1beta' });
 
       const hasValidScrapedData = scraped?.title && scraped.title.length > 10;
 

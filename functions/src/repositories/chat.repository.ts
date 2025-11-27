@@ -49,17 +49,27 @@ export const chatRepository = {
 
     // 3. Save Message
     // We allow saving 'parts' array directly to support Tool Calls in the future
-    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string }) => {
+    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string; [key: string]: any }) => {
+        const messageData: any = {
+            role,
+            parts,
+            userId: meta?.userId || null,
+            agentId: meta?.agentId || null,
+            timestamp: new Date().toISOString()
+        };
+
+        // Store additional metadata (like taxiRequestId, bookingId, etc.)
+        if (meta) {
+            const { userId, agentId, ...additionalMeta } = meta;
+            if (Object.keys(additionalMeta).length > 0) {
+                messageData.metadata = additionalMeta;
+            }
+        }
+
         await db.collection('chatSessions')
             .doc(sessionId)
             .collection('messages')
-            .add({
-                role,
-                parts,
-                userId: meta?.userId || null,
-                agentId: meta?.agentId || null,
-                timestamp: new Date().toISOString()
-            });
+            .add(messageData);
 
         // Update parent session timestamp (for housekeeping)
         await db.collection('chatSessions').doc(sessionId).update({

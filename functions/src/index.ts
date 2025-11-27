@@ -19,11 +19,20 @@ export const stripeWebhook = onRequest(
         const signature = req.headers['stripe-signature'] as string;
 
         try {
-            // In Cloud Functions, req.rawBody is available
-            await paymentService.handleWebhook(signature, (req as any).rawBody);
+            // Get raw body - in Cloud Functions v2, rawBody should be available
+            // If not, read from request body buffer
+            const rawBody = (req as any).rawBody || Buffer.from(JSON.stringify(req.body));
+
+            if (!rawBody) {
+                logger.error('❌ No rawBody available for Stripe webhook verification');
+                res.status(400).send('Missing raw body');
+                return;
+            }
+
+            await paymentService.handleWebhook(signature, rawBody);
             res.json({ received: true });
         } catch (err) {
-            logger.error(err);
+            logger.error('Stripe webhook error:', err);
             res.status(400).send('Webhook Error');
         }
     }
@@ -90,4 +99,17 @@ export const testTypesense = onRequest(
             res.status(500).json({ error: error.message });
         }
     }
+);
+
+// 8. Twilio WhatsApp Webhook (Incoming Messages)
+import { handleIncomingWhatsApp, handleMessageStatus } from "./controllers/twilio.controller";
+export const twilioWebhook = onRequest(
+    { region: "europe-west1", memory: "256MiB", cors: false },
+    handleIncomingWhatsApp
+);
+
+// 9. Twilio Message Status Webhook
+export const twilioStatus = onRequest(
+    { region: "europe-west1", memory: "256MiB", cors: false },
+    handleMessageStatus
 );

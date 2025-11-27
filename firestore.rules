@@ -68,7 +68,10 @@ service cloud.firestore {
     match /socialGroups/{groupId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+      // Only owner/admin can update or delete groups
+      allow update, delete: if isAuthenticated() &&
+        (resource.data.ownerId == request.auth.uid ||
+         request.auth.uid in resource.data.admins);
     }
 
     match /socialUsers/{userId} {
@@ -79,8 +82,8 @@ service cloud.firestore {
     match /waves/{waveId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      // Only the sender can update or delete their own waves
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.senderId);
     }
 
     match /notifications/{notificationId} {
@@ -91,7 +94,9 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow read, write: if isAuthenticated();
+      // Only allow access if user is a participant in the conversation
+      allow read, write: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
     }
 
     // --- CRM (Business Only) ---
@@ -109,6 +114,71 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && isBusiness();
+    }
+
+    // --- TAXI SYSTEM ---
+    // Drivers collection - drivers can update their own status/location
+    match /taxi_drivers/{driverId} {
+      allow read: if isAuthenticated();
+      // Only allow drivers to update their own profile
+      allow update: if isAuthenticated() && isOwner(driverId);
+      // Only backend (Admin SDK) should create/delete drivers
+      allow create, delete: if false;
+    }
+
+    // Taxi requests - managed primarily by backend for atomic operations
+    match /taxi_requests/{requestId} {
+      // Users can read their own requests
+      // Assigned drivers can read their jobs
+      // Broadcasted drivers can read pending requests to decide whether to accept
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.assignedDriverId == request.auth.uid ||
+         (resource.data.status == 'pending' && request.auth.uid in resource.data.broadcastSentTo));
+      
+      // Only backend (Admin SDK via Cloud Functions) should create/update/delete
+      // to ensure atomic transaction logic and prevent race conditions
+      allow create, update, delete: if false;
+    }
+
+    // --- NEW SOCIAL FEATURES ---
+    
+    // Tribes (Communities)
+    match /tribes/{tribeId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.ownerId);
+      
+      // Tribe Members
+      match /members/{memberId} {
+        allow read: if true;
+        allow write: if isAuthenticated() && (isOwner(memberId) || isOwner(get(/databases/$(database)/documents/tribes/$(tribeId)).data.ownerId));
+      }
+      
+      // Tribe Posts
+      match /posts/{postId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (isOwner(resource.data.userId) || isOwner(get(/databases/$(database)/documents/tribes/$(tribeId)).data.ownerId));
+      }
+    }
+
+    // Check-ins (Location Sharing)
+    match /checkIns/{checkInId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Itineraries (Trip Planning)
+    match /itineraries/{itineraryId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || resource.data.isPublic == true);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      match /items/{itemId} {
+        allow read, write: if isAuthenticated() && isOwner(get(/databases/$(database)/documents/itineraries/$(itineraryId)).data.userId);
+      }
     }
   }
 }

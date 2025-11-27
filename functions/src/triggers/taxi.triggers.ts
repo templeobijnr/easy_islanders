@@ -1,4 +1,5 @@
-import * as functions from 'firebase-functions';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import * as logger from 'firebase-functions/logger';
 import { db } from '../config/firebase';
 import * as repo from '../repositories/taxi.repository';
 import { sendWhatsApp } from '../services/twilio.service';
@@ -7,9 +8,13 @@ import { sendWhatsApp } from '../services/twilio.service';
  * Scheduled function to check for expired taxi requests
  * Runs every 2 minutes
  */
-export const checkTaxiRequestTimeouts = functions.pubsub
-    .schedule('every 2 minutes')
-    .onRun(async (context) => {
+export const checkTaxiRequestTimeouts = onSchedule(
+    {
+        schedule: 'every 2 minutes',
+        region: 'europe-west1',
+        timeoutSeconds: 120
+    },
+    async (event) => {
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
         try {
@@ -19,7 +24,7 @@ export const checkTaxiRequestTimeouts = functions.pubsub
                 .where('createdAt', '<', fiveMinutesAgo)
                 .get();
 
-            console.log(`Found ${snapshot.size} expired taxi requests`);
+            logger.info(`Found ${snapshot.size} expired taxi requests`);
 
             // Process each expired request
             const promises = snapshot.docs.map(async (doc) => {
@@ -35,11 +40,11 @@ export const checkTaxiRequestTimeouts = functions.pubsub
                         `Sorry, no drivers are available at the moment. Please try again or consider pre-booking your ride.`
                     );
                 } catch (error) {
-                    console.error(`Failed to notify customer ${data.customerPhone}:`, error);
+                    logger.error(`Failed to notify customer ${data.customerPhone}:`, error);
                 }
 
                 // Log for ops team monitoring
-                console.log(`Request ${doc.id} expired - no driver assigned`);
+                logger.info(`Request ${doc.id} expired - no driver assigned`);
 
                 // Optional: Alert ops team
                 // await alertOpsTeam(`Missed booking: ${doc.id}`);
@@ -47,9 +52,9 @@ export const checkTaxiRequestTimeouts = functions.pubsub
 
             await Promise.all(promises);
 
-            console.log(`Processed ${promises.length} expired requests`);
+            logger.info(`Processed ${promises.length} expired requests`);
         } catch (error) {
-            console.error('Error checking taxi request timeouts:', error);
+            logger.error('Error checking taxi request timeouts:', error);
             throw error;
         }
     });
@@ -64,3 +69,6 @@ async function alertOpsTeam(message: string): Promise<void> {
   console.log(`OPS ALERT: ${message}`);
 }
 */
+
+// Export the status change trigger
+export * from './taxi-status.trigger';

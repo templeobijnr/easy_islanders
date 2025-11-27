@@ -6,13 +6,18 @@ const REQUESTS_COLLECTION = 'taxi_requests';
 
 /**
  * Find available taxis in a specific district
+ * If district is "Unknown", broadcasts to ALL available drivers
  */
 export const findAvailableTaxis = async (district: string, limit: number = 5): Promise<TaxiDriver[]> => {
-    const snapshot = await db.collection(DRIVERS_COLLECTION)
-        .where('status', '==', 'available')
-        .where('currentLocation.district', '==', district)
-        .limit(limit)
-        .get();
+    let query = db.collection(DRIVERS_COLLECTION)
+        .where('status', '==', 'available');
+
+    // Only filter by district if it's known
+    if (district && district !== 'Unknown') {
+        query = query.where('currentLocation.district', '==', district);
+    }
+
+    const snapshot = await query.limit(limit).get();
 
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaxiDriver));
 };
@@ -63,22 +68,34 @@ export const assignDriverToRequest = async (requestId: string, driverId: string)
         const driverRef = db.collection(DRIVERS_COLLECTION).doc(driverId);
 
         const requestDoc = await transaction.get(requestRef);
+        const driverDoc = await transaction.get(driverRef);
+
         if (!requestDoc.exists) {
             throw new Error("Request not found");
         }
 
-        const data = requestDoc.data() as TaxiRequest;
+        if (!driverDoc.exists) {
+            throw new Error("Driver not found");
+        }
+
+        const requestData = requestDoc.data() as TaxiRequest;
+        const driverData = driverDoc.data() as TaxiDriver;
 
         // CRITICAL: Check if already assigned
-        if (data.status !== 'pending' || data.assignedDriverId) {
+        if (requestData.status !== 'pending' || requestData.assignedDriverId) {
             return false; // Too late, someone else took it
         }
 
-        // Lock the ride
+        // Lock the ride and store driver details
         transaction.update(requestRef, {
             status: 'assigned',
             assignedDriverId: driverId,
-            assignedAt: new Date()
+            assignedAt: new Date(),
+            // Store driver details for easy access
+            driverName: driverData.name,
+            driverPhone: driverData.phone,
+            vehicleType: driverData.vehicleType,
+            rating: driverData.rating
         });
 
         // Mark driver as busy

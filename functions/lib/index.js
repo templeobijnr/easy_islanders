@@ -39,7 +39,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.testTypesense = exports.googlePlacesProxy = exports.populate = exports.reindex = exports.stripeWebhook = exports.api = void 0;
+exports.twilioStatus = exports.twilioWebhook = exports.testTypesense = exports.googlePlacesProxy = exports.populate = exports.reindex = exports.stripeWebhook = exports.api = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const dotenv = __importStar(require("dotenv"));
@@ -106,4 +106,9 @@ exports.testTypesense = (0, https_1.onRequest)({ region: "europe-west1", memory:
         res.status(500).json({ error: error.message });
     }
 });
+// 8. Twilio WhatsApp Webhook (Incoming Messages)
+const twilio_controller_1 = require("./controllers/twilio.controller");
+exports.twilioWebhook = (0, https_1.onRequest)({ region: "europe-west1", memory: "256MiB", cors: false }, twilio_controller_1.handleIncomingWhatsApp);
+// 9. Twilio Message Status Webhook
+exports.twilioStatus = (0, https_1.onRequest)({ region: "europe-west1", memory: "256MiB", cors: false }, twilio_controller_1.handleMessageStatus);
 //# sourceMappingURL=index.js.map

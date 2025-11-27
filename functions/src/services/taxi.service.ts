@@ -1,6 +1,7 @@
 import * as repo from '../repositories/taxi.repository';
 import { TaxiRequest, TaxiDriver } from '../types/taxi';
 import { sendWhatsApp } from './twilio.service';
+import { db } from '../config/firebase';
 
 /**
  * Broadcast request to available drivers
@@ -45,13 +46,19 @@ Reply *YES ${requestCode}* to accept.`;
 export const handleDriverReply = async (driverPhone: string, messageBody: string): Promise<string> => {
     // Clean phone number (remove whatsapp: prefix)
     const phone = driverPhone.replace('whatsapp:', '');
+    console.log(`🚖 [handleDriverReply] Processing reply from: ${phone}`);
+    console.log(`📝 [handleDriverReply] Message: ${messageBody}`);
 
     // Find the most recent pending request this driver was messaged about
+    console.log(`🔍 [handleDriverReply] Looking for pending request for driver...`);
     const request = await repo.findPendingRequestForDriver(phone);
 
     if (!request) {
+        console.log(`⚠️ [handleDriverReply] No active requests found for ${phone}`);
         return "No active requests found.";
     }
+
+    console.log(`✅ [handleDriverReply] Found request: ${request.id}`);
 
     const messageTrimmed = messageBody.trim().toUpperCase();
 
@@ -70,7 +77,10 @@ export const handleDriverReply = async (driverPhone: string, messageBody: string
             // Send detailed pickup info to driver
             await sendDriverDetails(driver, request);
 
-            return `✅ Job Accepted! 
+            // Send real-time update to customer's chat
+            await sendChatUpdate(request, driver);
+
+            return `✅ Job Accepted!
 Customer: ${request.customerName}
 Pickup: ${request.pickup.address}
 Destination: ${request.dropoff.address}`;
@@ -107,6 +117,69 @@ Contact: ${driver.phone}`;
 }
 
 /**
+ * Send real-time update to customer's chat session
+ */
+async function sendChatUpdate(request: TaxiRequest, driver: TaxiDriver): Promise<void> {
+    try {
+        const { db } = await import('../config/firebase');
+
+        // Find the user's active chat session
+        const sessionsSnap = await db.collection('chat_sessions')
+            .where('userId', '==', request.userId)
+            .where('status', '==', 'active')
+            .orderBy('lastMessageAt', 'desc')
+            .limit(1)
+            .get();
+
+        if (sessionsSnap.empty) {
+            console.log('⚠️ [Chat Update] No active session found for user:', request.userId);
+            return;
+        }
+
+        const sessionId = sessionsSnap.docs[0].id;
+
+        // Create a system message in the chat
+        const systemMessage = {
+            role: 'model',
+            parts: [{
+                text: `🚕 *Taxi Update*\n\nGreat news! Your taxi has been confirmed!\n\n👤 **Driver:** ${driver.name}\n🚗 **Vehicle:** ${driver.vehicleType}\n⭐ **Rating:** ${driver.rating}/5\n📞 **Contact:** ${driver.phone}\n\nYour driver will contact you shortly and is on the way to pick you up.`
+            }],
+            timestamp: new Date(),
+            metadata: {
+                type: 'taxi_status_update',
+                requestId: request.id,
+                status: 'assigned',
+                driverInfo: {
+                    name: driver.name,
+                    phone: driver.phone,
+                    vehicleType: driver.vehicleType,
+                    rating: driver.rating
+                }
+            }
+        };
+
+        // Add to chat history
+        await db.collection('chat_sessions')
+            .doc(sessionId)
+            .collection('messages')
+            .add(systemMessage);
+
+        // Update session timestamp
+        await db.collection('chat_sessions')
+            .doc(sessionId)
+            .update({
+                lastMessageAt: new Date(),
+                hasUnreadMessages: true
+            });
+
+        console.log(`✅ [Chat Update] Sent taxi status update to session: ${sessionId}`);
+
+    } catch (error) {
+        console.error('❌ [Chat Update] Failed to send chat update:', error);
+    }
+}
+
+/**
  * Send detailed pickup information to driver
  */
 async function sendDriverDetails(driver: TaxiDriver, request: TaxiRequest): Promise<void> {
@@ -133,7 +206,10 @@ Phone: ${request.customerPhone}
 /**
  * Create and broadcast a new taxi request
  */
-export const createAndBroadcastRequest = async (requestData: Omit<TaxiRequest, 'id' | 'status' | 'createdAt' | 'broadcastSentTo'>): Promise<string> => {
+export const createAndBroadcastRequest = async (
+    requestData: Omit<TaxiRequest, 'id' | 'status' | 'createdAt' | 'broadcastSentTo'>,
+    sessionId?: string
+): Promise<string> => {
     // Create the request
     const requestId = await repo.createTaxiRequest(requestData);
 
@@ -142,6 +218,20 @@ export const createAndBroadcastRequest = async (requestData: Omit<TaxiRequest, '
 
     if (!request) {
         throw new Error('Failed to create taxi request');
+    }
+
+    // Store requestId in chat session for agent tracking
+    if (sessionId) {
+        try {
+            await db.collection('chat_sessions').doc(sessionId).set({
+                pendingTaxiRequestId: requestId,
+                lastMessageAt: new Date()
+            }, { merge: true });
+            console.log(`✅ [Taxi Service] Stored requestId ${requestId} in session ${sessionId}`);
+        } catch (error) {
+            console.error(`⚠️ [Taxi Service] Failed to store requestId in session:`, error);
+            // Don't fail the request creation if session update fails
+        }
     }
 
     // Broadcast to drivers

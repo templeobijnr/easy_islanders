@@ -212,8 +212,8 @@ const importPropertyFromUrl = async (req, res) => {
         if (genAI && GEMINI_API_KEY) {
             console.log('🤖 [AI] Enhancing with Gemini...');
             const model = genAI.getGenerativeModel({
-                model: 'gemini-2.0-flash-exp'
-            });
+                model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+            }, { apiVersion: 'v1beta' });
             const hasValidScrapedData = (scraped === null || scraped === void 0 ? void 0 : scraped.title) && scraped.title.length > 10;
             const prompt = `
         Extract property listing data from this URL: ${url}

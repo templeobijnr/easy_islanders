@@ -6,13 +6,16 @@ const DRIVERS_COLLECTION = 'taxi_drivers';
 const REQUESTS_COLLECTION = 'taxi_requests';
 /**
  * Find available taxis in a specific district
+ * If district is "Unknown", broadcasts to ALL available drivers
  */
 const findAvailableTaxis = async (district, limit = 5) => {
-    const snapshot = await firebase_1.db.collection(DRIVERS_COLLECTION)
-        .where('status', '==', 'available')
-        .where('currentLocation.district', '==', district)
-        .limit(limit)
-        .get();
+    let query = firebase_1.db.collection(DRIVERS_COLLECTION)
+        .where('status', '==', 'available');
+    // Only filter by district if it's known
+    if (district && district !== 'Unknown') {
+        query = query.where('currentLocation.district', '==', district);
+    }
+    const snapshot = await query.limit(limit).get();
     return snapshot.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
 };
 exports.findAvailableTaxis = findAvailableTaxis;
@@ -56,19 +59,29 @@ const assignDriverToRequest = async (requestId, driverId) => {
         const requestRef = firebase_1.db.collection(REQUESTS_COLLECTION).doc(requestId);
         const driverRef = firebase_1.db.collection(DRIVERS_COLLECTION).doc(driverId);
         const requestDoc = await transaction.get(requestRef);
+        const driverDoc = await transaction.get(driverRef);
         if (!requestDoc.exists) {
             throw new Error("Request not found");
         }
-        const data = requestDoc.data();
+        if (!driverDoc.exists) {
+            throw new Error("Driver not found");
+        }
+        const requestData = requestDoc.data();
+        const driverData = driverDoc.data();
         // CRITICAL: Check if already assigned
-        if (data.status !== 'pending' || data.assignedDriverId) {
+        if (requestData.status !== 'pending' || requestData.assignedDriverId) {
             return false; // Too late, someone else took it
         }
-        // Lock the ride
+        // Lock the ride and store driver details
         transaction.update(requestRef, {
             status: 'assigned',
             assignedDriverId: driverId,
-            assignedAt: new Date()
+            assignedAt: new Date(),
+            // Store driver details for easy access
+            driverName: driverData.name,
+            driverPhone: driverData.phone,
+            vehicleType: driverData.vehicleType,
+            rating: driverData.rating
         });
         // Mark driver as busy
         transaction.update(driverRef, {

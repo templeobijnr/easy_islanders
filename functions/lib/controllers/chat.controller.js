@@ -131,7 +131,13 @@ const handleChatMessage = async (req, res) => {
             - Use the user's name (${userName}) naturally for a more personal tone when appropriate.
             - If user is already on-island / mobile / has_car / declined pickup, do not upsell airport pickup. Prefer in-island services instead.
             - Be date-aware: convert vague ranges like "next week Thursday to the following Friday" to concrete dates using current time (${timeString}). Avoid re-asking if you can compute dates.
-            - If you have a pickup (user shared location or specified) AND a destination, CALL the dispatchTaxi tool immediately. Do not reply with text instead of calling the tool.
+
+            [CRITICAL - TAXI TOOL USAGE]
+            - When you have BOTH a pickup location AND a destination, you MUST call the dispatchTaxi function
+            - DO NOT say "I'm dispatching a taxi" or "I'll send a taxi" - ACTUALLY CALL THE TOOL
+            - DO NOT respond with text when you should call dispatchTaxi
+            - ALWAYS use function calls instead of describing what you're doing
+            - If pickup location is "Current location" or user shared location, use the coordinates provided below
 
             [LOCATION HANDLING - CRITICAL]
             - NEVER ask users for "latitude", "longitude", "GPS coordinates", or any technical location data
@@ -143,10 +149,19 @@ const handleChatMessage = async (req, res) => {
         `;
         console.log('🟦 [Backend] Initializing Gemini...');
         // 3. Initialize Model with History
+        // Use v1beta API for experimental models with tool support
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+        console.log(`🤖 Using model: ${modelName}`);
+        console.log(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: modelName,
             systemInstruction: contextPrompt,
-            tools: [{ functionDeclarations: agentTools_1.ALL_TOOL_DEFINITIONS }]
+            tools: [{ functionDeclarations: agentTools_1.ALL_TOOL_DEFINITIONS }],
+            toolConfig: {
+                functionCallingConfig: {
+                    mode: generative_ai_1.FunctionCallingMode.AUTO // Allow model to choose when to call functions
+                }
+            }
         }, { apiVersion: 'v1beta' });
         // Ensure history starts with a user message
         let validHistory = history.map(h => ({
@@ -168,6 +183,7 @@ const handleChatMessage = async (req, res) => {
         let payment = null;
         let viewingRequest = null;
         let mapLocation = null;
+        let taxiRequestId = null;
         // Loop while there are function calls
         let functionCalls = response.functionCalls();
         while (functionCalls && functionCalls.length > 0) {
@@ -227,20 +243,26 @@ const handleChatMessage = async (req, res) => {
                     else if (fnName === 'sendWhatsAppMessage') {
                         toolResult = await toolService_1.toolResolvers.sendWhatsAppMessage(fnArgs);
                     }
-                    else if (fnName === 'dispatchTaxi') {
+                    else if (fnName === 'dispatchTaxi' || fnName === 'requestTaxi') {
                         // Auto-inject user location (current or last known) if available
                         const enrichedArgs = Object.assign({}, fnArgs);
                         const locationForTaxi = effectiveLocation || userLocation;
                         if (locationForTaxi && !enrichedArgs.pickupLat && !enrichedArgs.pickupLng) {
                             enrichedArgs.pickupLat = locationForTaxi.lat;
                             enrichedArgs.pickupLng = locationForTaxi.lng;
-                            console.log('📍 [Backend] Auto-injected user location into dispatchTaxi:', locationForTaxi);
+                            console.log(`📍 [Backend] Auto-injected user location into ${fnName}:`, locationForTaxi);
                         }
                         // If pickupLocation is missing or too generic, label it clearly for the driver
                         if (!enrichedArgs.pickupLocation || /^current location$/i.test(enrichedArgs.pickupLocation)) {
                             enrichedArgs.pickupLocation = 'Current location (see map link)';
                         }
-                        toolResult = await toolService_1.toolResolvers.dispatchTaxi(enrichedArgs, user.uid);
+                        const resolver = fnName === 'dispatchTaxi' ? toolService_1.toolResolvers.dispatchTaxi : toolService_1.toolResolvers.requestTaxi;
+                        toolResult = await resolver(enrichedArgs, user.uid, sessionId);
+                        // Capture requestId for frontend tracking
+                        if (toolResult.success && toolResult.requestId) {
+                            taxiRequestId = toolResult.requestId;
+                            console.log(`🚕 [Backend] Captured taxi requestId: ${taxiRequestId}`);
+                        }
                     }
                     else if (fnName === 'orderHouseholdSupplies') {
                         toolResult = await toolService_1.toolResolvers.orderHouseholdSupplies(fnArgs, user.uid);
@@ -331,9 +353,14 @@ const handleChatMessage = async (req, res) => {
             console.warn('⚠️ [Backend] Final fallback used for empty response');
         }
         // 6. Persistence (Save both sides)
+        const modelMessageMeta = { userId: user.uid, agentId };
+        // Add taxi requestId to metadata for frontend tracking
+        if (taxiRequestId) {
+            modelMessageMeta.taxiRequestId = taxiRequestId;
+        }
         await Promise.all([
             chat_repository_1.chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId }),
-            chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: text }], { userId: user.uid, agentId })
+            chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: text }], modelMessageMeta)
         ]);
         console.log('📤 [Backend] Sending response. Has mapLocation?', !!mapLocation, mapLocation);
         const responseData = {

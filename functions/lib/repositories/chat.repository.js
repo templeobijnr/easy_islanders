@@ -1,4 +1,15 @@
 "use strict";
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatRepository = void 0;
 const firestore_1 = require("firebase-admin/firestore");
@@ -47,16 +58,24 @@ exports.chatRepository = {
     // 3. Save Message
     // We allow saving 'parts' array directly to support Tool Calls in the future
     saveMessage: async (sessionId, role, parts, meta) => {
-        await firebase_1.db.collection('chatSessions')
-            .doc(sessionId)
-            .collection('messages')
-            .add({
+        const messageData = {
             role,
             parts,
             userId: (meta === null || meta === void 0 ? void 0 : meta.userId) || null,
             agentId: (meta === null || meta === void 0 ? void 0 : meta.agentId) || null,
             timestamp: new Date().toISOString()
-        });
+        };
+        // Store additional metadata (like taxiRequestId, bookingId, etc.)
+        if (meta) {
+            const { userId, agentId } = meta, additionalMeta = __rest(meta, ["userId", "agentId"]);
+            if (Object.keys(additionalMeta).length > 0) {
+                messageData.metadata = additionalMeta;
+            }
+        }
+        await firebase_1.db.collection('chatSessions')
+            .doc(sessionId)
+            .collection('messages')
+            .add(messageData);
         // Update parent session timestamp (for housekeeping)
         await firebase_1.db.collection('chatSessions').doc(sessionId).update({
             lastMessageAt: new Date().toISOString(),
