@@ -1,247 +1,615 @@
-
-import React, { useState } from 'react';
-import { Building2, Car, Briefcase, Utensils, ArrowLeft, Sparkles, ShoppingBag, Calendar, Hotel, Key, Tag } from 'lucide-react';
-import { BusinessConfig, MarketplaceDomain } from '../../types';
-import { useAuth } from '../context/AuthContext';
+import { logger } from "@/utils/logger";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Building2,
+  ArrowLeft,
+  Search,
+  MapPin,
+  Check,
+  Loader2,
+  Store,
+  Phone,
+  Globe,
+} from "lucide-react";
+import { BusinessConfig } from "../../types";
+import { useAuth } from "../context/AuthContext";
+import {
+  collection,
+  query,
+  getDocs,
+  limit,
+  orderBy,
+  startAt,
+  endAt,
+} from "firebase/firestore";
+import { auth, db } from "../services/firebaseConfig";
+import {
+  PhoneAuthProvider,
+  RecaptchaVerifier,
+  linkWithCredential,
+} from "firebase/auth";
 
 interface BusinessOnboardingProps {
   onComplete: (config: BusinessConfig) => void;
   onExit: () => void;
 }
 
-type Step = 'intro' | 'domain_select' | 'sub_type' | 'details';
+type Step = "intro" | "search" | "confirm" | "verify" | "success";
 
-const DOMAIN_OPTIONS = [
-  { 
-    id: 'Real Estate', 
-    icon: Building2, 
-    label: 'Real Estate',
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    border: 'hover:border-rose-200'
-  },
-  { 
-    id: 'Cars', 
-    icon: Car, 
-    label: 'Cars & Vehicles',
-    color: 'text-blue-600',
-    bg: 'bg-blue-50',
-    border: 'hover:border-blue-200'
-  },
-  { 
-    id: 'Marketplace', 
-    icon: ShoppingBag, 
-    label: 'Marketplace',
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    border: 'hover:border-indigo-200'
-  },
-  { 
-    id: 'Events', 
-    icon: Calendar, 
-    label: 'Events',
-    color: 'text-pink-600',
-    bg: 'bg-pink-50',
-    border: 'hover:border-pink-200'
-  },
-  { 
-    id: 'Restaurants', 
-    icon: Utensils, 
-    label: 'Restaurants',
-    color: 'text-orange-500',
-    bg: 'bg-orange-50',
-    border: 'hover:border-orange-200'
-  },
-  { 
-    id: 'Services', 
-    icon: Briefcase, 
-    label: 'Services',
-    color: 'text-teal-600',
-    bg: 'bg-teal-50',
-    border: 'hover:border-teal-200'
-  },
-  { 
-    id: 'Hotels', 
-    icon: Hotel, 
-    label: 'Hotels & Stays',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    border: 'hover:border-emerald-200'
-  },
-  { 
-    id: 'Health & Beauty', 
-    icon: Sparkles, 
-    label: 'Health & Beauty',
-    color: 'text-violet-600',
-    bg: 'bg-violet-50',
-    border: 'hover:border-violet-200'
-  }
-];
+interface PlaceResult {
+  id: string;
+  title: string;
+  category: string;
+  address?: string;
+  region?: string;
+  images?: string[];
+  ownerId?: string; // If already claimed
+}
 
-const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({ onComplete, onExit }) => {
-  const [step, setStep] = useState<Step>('intro');
-  const [config, setConfig] = useState<BusinessConfig>({ domain: null, subType: null, businessName: '' });
-  const { user } = useAuth();
+const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
+  onComplete,
+  onExit,
+}) => {
+  const [step, setStep] = useState<Step>("intro");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceResult | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const { user, firebaseUser, forceRefreshToken } = useAuth();
+  const [businessPhoneE164, setBusinessPhoneE164] = useState<string | null>(
+    null,
+  );
+  const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [claimError, setClaimError] = useState<string | null>(null);
 
-  const generateBusinessId = () => {
-    const uid = user?.id || 'anon';
-    return `biz_${uid}_${Date.now()}`;
+  // Debounced search
+  const searchPlaces = useCallback(async (q: string) => {
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // Search Firestore listings collection
+      // We capitalize the first letter to match standard titles since Firestore is case-sensitive
+      const searchTerm = q.charAt(0).toUpperCase() + q.slice(1);
+      const endTerm = searchTerm + "\uf8ff";
+
+      const listingsRef = collection(db, "listings");
+      // Simple prefix search
+      const qry = query(
+        listingsRef,
+        orderBy("title"),
+        startAt(searchTerm),
+        endAt(endTerm),
+        limit(20),
+      );
+
+      const snapshot = await getDocs(qry);
+
+      // Map to PlaceResult
+      const results = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name,
+          category: data.category,
+          address: data.address || data.location,
+          region: data.region,
+          images: data.images,
+          ownerId: data.ownerUid, // Map ownerUid to ownerId for this component
+        } as PlaceResult;
+      });
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+      // Fallback: fetch general batch and filter (if index missing for orderBy title)
+      try {
+        const listingsRef = collection(db, "listings");
+        const snapshot = await getDocs(query(listingsRef, limit(50)));
+        const results = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              title: data.title || data.name,
+              category: data.category,
+              address: data.address || data.location,
+              region: data.region,
+              images: data.images,
+              ownerId: data.ownerUid,
+            } as PlaceResult;
+          })
+          .filter((p) => p.title?.toLowerCase().includes(q.toLowerCase()));
+        setSearchResults(results);
+      } catch (fallbackError) {
+        console.error("Fallback search failed", fallbackError);
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) {
+        searchPlaces(searchQuery);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchPlaces]);
+
+  const handleSelectPlace = (place: PlaceResult) => {
+    setSelectedPlace(place);
+    setStep("confirm");
   };
 
-  const handleDomainSelect = (domain: MarketplaceDomain) => {
-    setConfig({ ...config, domain });
-    if (domain === 'Cars') {
-       setStep('sub_type');
-    } else {
-       setStep('details');
+  const getV1GatewayBase = () => {
+    let base =
+      import.meta.env.VITE_API_URL ||
+      "http://localhost:5001/easy-islanders/europe-west1/api";
+    base = base.replace(/\/+$/, "").replace(/\/v1$/, "");
+    if (base.endsWith("/api")) base = base.replace(/\/api$/, "/apiV1");
+    return base;
+  };
+
+  const getAuthToken = async () => {
+    if (!firebaseUser) return null;
+    return firebaseUser.getIdToken();
+  };
+
+  const handleClaimBusiness = async () => {
+    if (!selectedPlace || !user?.id) return;
+    setClaimError(null);
+
+    setIsClaiming(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) throw new Error("AUTH_REQUIRED");
+
+      // 1) Start claim on server (pending) and get the phone to verify.
+      const startRes = await fetch(`${getV1GatewayBase()}/v1/claim/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ businessId: selectedPlace.id }),
+      });
+
+      const startJson = await startRes.json().catch(() => ({}));
+      if (!startRes.ok) {
+        throw new Error(
+          startJson?.message || startJson?.error || "Failed to start claim",
+        );
+      }
+
+      const phone = startJson?.businessPhoneE164 as string | undefined;
+      if (!phone) {
+        throw new Error(
+          "This business has no phone number available for verification.",
+        );
+      }
+
+      setBusinessPhoneE164(phone);
+
+      // DEV MODE: Skip phone verification entirely
+      const isDevMode =
+        import.meta.env.VITE_DEV_MODE === "true" || import.meta.env.DEV;
+      if (isDevMode) {
+        logger.debug(
+          "[DEV MODE] Skipping phone verification, using dev bypass",
+        );
+        // Use dev bypass endpoint instead of phone verification
+        const bypassRes = await fetch(
+          `${getV1GatewayBase()}/v1/claim/dev-bypass`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ businessId: selectedPlace.id }),
+          },
+        );
+
+        const bypassJson = await bypassRes.json().catch(() => ({}));
+        if (!bypassRes.ok) {
+          throw new Error(
+            bypassJson?.message || bypassJson?.error || "Dev bypass failed",
+          );
+        }
+
+        await forceRefreshToken();
+
+        const config: BusinessConfig = {
+          id: selectedPlace.id,
+          businessName: selectedPlace.title,
+          domain: selectedPlace.category || "Services",
+          subType: null,
+          ownerUid: user?.id,
+          placeId: selectedPlace.id,
+        };
+
+        setStep("success");
+        setTimeout(() => onComplete(config), 1200);
+        return;
+      }
+
+      // PRODUCTION: Send OTP via Firebase Phone Auth and link phoneNumber to the current user.
+      const recaptcha = new RecaptchaVerifier(auth, "recaptcha-container", {
+        size: "invisible",
+      });
+      const provider = new PhoneAuthProvider(auth);
+      const id = await provider.verifyPhoneNumber(phone, recaptcha);
+      setVerificationId(id);
+      setOtpCode("");
+      setStep("verify");
+    } catch (error: any) {
+      console.error("Claim failed:", error);
+      setClaimError(
+        error?.message || "Failed to start claim. Please try again.",
+      );
+    } finally {
+      setIsClaiming(false);
     }
   };
 
-  const handleFinish = () => {
-    if (config.businessName && config.domain) {
-        const finalConfig: BusinessConfig = {
-          ...config,
-          id: config.id || generateBusinessId(),
-          ownerUid: user?.id
-        };
-        onComplete(finalConfig);
+  const handleConfirmOtp = async () => {
+    if (!selectedPlace || !verificationId) return;
+    setIsClaiming(true);
+    setClaimError(null);
+
+    try {
+      if (!auth.currentUser) throw new Error("AUTH_REQUIRED");
+      const credential = PhoneAuthProvider.credential(
+        verificationId,
+        otpCode.trim(),
+      );
+      await linkWithCredential(auth.currentUser, credential);
+
+      const token = await getAuthToken();
+      if (!token) throw new Error("AUTH_REQUIRED");
+
+      const confirmRes = await fetch(`${getV1GatewayBase()}/v1/claim/confirm`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ businessId: selectedPlace.id }),
+      });
+
+      const confirmJson = await confirmRes.json().catch(() => ({}));
+      if (!confirmRes.ok) {
+        throw new Error(
+          confirmJson?.message ||
+            confirmJson?.error ||
+            "Claim confirmation failed",
+        );
+      }
+
+      await forceRefreshToken();
+
+      const config: BusinessConfig = {
+        id: selectedPlace.id,
+        businessName: selectedPlace.title,
+        domain: selectedPlace.category || "Services",
+        subType: null,
+        ownerUid: user?.id,
+        placeId: selectedPlace.id,
+      };
+
+      setStep("success");
+      setTimeout(() => onComplete(config), 1200);
+    } catch (error: any) {
+      console.error("OTP confirm failed:", error);
+      setClaimError(error?.message || "Verification failed. Please try again.");
+    } finally {
+      setIsClaiming(false);
     }
   };
 
   return (
-      <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-        <div className="p-6">
-          <button onClick={onExit} className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-medium transition-colors">
-            <ArrowLeft size={20} /> Back to Consumer App
-          </button>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-center p-4">
-           <div className="max-w-3xl w-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden relative min-h-[500px] flex flex-col">
-              
-              {step === 'intro' && (
-                <div className="p-12 text-center flex flex-col items-center justify-center flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                   <div className="w-24 h-24 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl shadow-slate-200">
-                      <Building2 size={48} />
-                   </div>
-                   <h2 className="text-4xl font-bold text-slate-900 mb-6 tracking-tight">Welcome to Business</h2>
-                   <p className="text-xl text-slate-500 mb-10 max-w-lg leading-relaxed">
-                     The AI-first operating system for island businesses. Manage listings, automate CRM, and reach global travelers.
-                   </p>
-                   <button 
-                     onClick={() => setStep('domain_select')} 
-                     className="px-10 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center gap-2 text-lg"
-                   >
-                     Launch Your Business
-                   </button>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="p-6">
+        <button
+          onClick={onExit}
+          className="text-slate-500 hover:text-slate-900 flex items-center gap-2 font-medium transition-colors"
+        >
+          <ArrowLeft size={20} /> Back to App
+        </button>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden relative min-h-[500px] flex flex-col">
+          {/* INTRO STEP */}
+          {step === "intro" && (
+            <div className="p-12 text-center flex flex-col items-center justify-center flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="w-24 h-24 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl shadow-slate-200">
+                <Store size={48} />
+              </div>
+              <h2 className="text-4xl font-bold text-slate-900 mb-4 tracking-tight">
+                Claim Your Business
+              </h2>
+              <p className="text-xl text-slate-500 mb-10 max-w-lg leading-relaxed">
+                Get your own AI agent that handles customer inquiries 24/7.
+                Search for your business to get started.
+              </p>
+              <button
+                onClick={() => setStep("search")}
+                className="px-10 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center gap-2 text-lg"
+              >
+                <Search size={20} />
+                Find My Business
+              </button>
+            </div>
+          )}
+
+          {/* SEARCH STEP */}
+          {step === "search" && (
+            <div className="p-8 flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
+              <h2 className="text-3xl font-bold text-slate-900 mb-2 text-center">
+                Find Your Business
+              </h2>
+              <p className="text-slate-500 text-center mb-8">
+                Search by business name or category
+              </p>
+
+              {/* Search Input */}
+              <div className="relative mb-6">
+                <Search
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={20}
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="e.g., Snaz Beach, Gym, Restaurant..."
+                  className="w-full pl-12 pr-4 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 outline-none text-lg transition-all"
+                  autoFocus
+                />
+                {isSearching && (
+                  <Loader2
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 animate-spin"
+                    size={20}
+                  />
+                )}
+              </div>
+
+              {/* Results */}
+              <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px]">
+                {searchResults.length === 0 &&
+                  searchQuery.length >= 2 &&
+                  !isSearching && (
+                    <div className="text-center py-8 text-slate-400">
+                      No businesses found matching "{searchQuery}"
+                    </div>
+                  )}
+
+                {searchResults.map((place) => (
+                  <button
+                    key={place.id}
+                    onClick={() => handleSelectPlace(place)}
+                    disabled={!!place.ownerId}
+                    className={`w-full p-4 border rounded-2xl text-left flex items-center gap-4 transition-all ${
+                      place.ownerId
+                        ? "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"
+                        : "border-slate-200 hover:border-slate-900 hover:shadow-md"
+                    }`}
+                  >
+                    {/* Image */}
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0">
+                      {place.images?.[0] ? (
+                        <img
+                          src={place.images[0]}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <Building2 size={24} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-slate-900 truncate">
+                        {place.title}
+                      </div>
+                      <div className="text-sm text-slate-500 flex items-center gap-1">
+                        <MapPin size={12} />
+                        {place.address || place.region || "North Cyprus"}
+                      </div>
+                      <div className="text-xs text-slate-400 capitalize">
+                        {place.category}
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    {place.ownerId ? (
+                      <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+                        Claimed
+                      </span>
+                    ) : (
+                      <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                        Available
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setStep("intro")}
+                  className="text-slate-400 hover:text-slate-600 text-sm font-medium"
+                >
+                  ← Back
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRM STEP */}
+          {step === "confirm" && selectedPlace && (
+            <div className="p-12 flex flex-col items-center justify-center flex-1 animate-in fade-in slide-in-from-right-4 duration-300">
+              {/* Business Card */}
+              <div className="w-full max-w-sm bg-slate-50 rounded-2xl p-6 mb-8">
+                <div className="w-20 h-20 rounded-2xl bg-slate-200 overflow-hidden mx-auto mb-4">
+                  {selectedPlace.images?.[0] ? (
+                    <img
+                      src={selectedPlace.images[0]}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <Building2 size={32} />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 text-center mb-1">
+                  {selectedPlace.title}
+                </h3>
+                <p className="text-slate-500 text-center text-sm">
+                  {selectedPlace.category}
+                </p>
+                <p className="text-slate-400 text-center text-xs mt-1">
+                  {selectedPlace.address || selectedPlace.region}
+                </p>
+              </div>
+
+              <h2 className="text-2xl font-bold text-slate-900 mb-4 text-center">
+                Claim This Business?
+              </h2>
+              <p className="text-slate-500 text-center mb-8 max-w-md">
+                We'll send a verification code to the business phone number on
+                file to confirm you own this listing.
+              </p>
+
+              {claimError && (
+                <div className="w-full max-w-md mb-6 p-4 rounded-2xl border border-red-200 bg-red-50 text-red-700 text-sm">
+                  {claimError}
                 </div>
               )}
 
-              {step === 'domain_select' && (
-                <div className="p-8 md:p-12 flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
-                   <h2 className="text-3xl font-bold text-slate-900 mb-2 text-center">Select Your Industry</h2>
-                   <p className="text-slate-500 text-center mb-8">What kind of business are you launching today?</p>
-                   
-                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                      {DOMAIN_OPTIONS.map(d => (
-                        <button
-                          key={d.id}
-                          onClick={() => handleDomainSelect(d.id as MarketplaceDomain)}
-                          className={`p-4 border border-slate-100 rounded-2xl transition-all flex flex-col items-center text-center group aspect-square justify-center gap-3 bg-white hover:shadow-lg ${d.border}`}
-                        >
-                          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 ${d.bg} ${d.color}`}>
-                             <d.icon size={28} />
-                          </div>
-                          <div className="font-bold text-slate-900 text-sm group-hover:text-slate-700">{d.label}</div>
-                        </button>
-                      ))}
-                   </div>
-                   <div className="mt-auto text-center">
-                      <button onClick={() => setStep('intro')} className="text-slate-400 hover:text-slate-600 text-sm font-medium">Back to Intro</button>
-                   </div>
+              {/* Invisible reCAPTCHA container required by Firebase Phone Auth */}
+              <div id="recaptcha-container" />
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setStep("search")}
+                  className="px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleClaimBusiness}
+                  disabled={isClaiming}
+                  className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isClaiming ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending code...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} />
+                      Send Verification Code
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* VERIFY STEP */}
+          {step === "verify" && selectedPlace && (
+            <div className="p-12 flex flex-col items-center justify-center flex-1 animate-in fade-in slide-in-from-right-4 duration-300">
+              <h2 className="text-2xl font-bold text-slate-900 mb-3 text-center">
+                Enter Verification Code
+              </h2>
+              <p className="text-slate-500 text-center mb-6 max-w-md">
+                We sent a code to{" "}
+                {businessPhoneE164 || "the business phone number"}. Enter it to
+                finish claiming your business.
+              </p>
+
+              {claimError && (
+                <div className="w-full max-w-md mb-6 p-4 rounded-2xl border border-red-200 bg-red-50 text-red-700 text-sm">
+                  {claimError}
                 </div>
               )}
 
-              {step === 'sub_type' && (
-                 <div className="p-8 md:p-12 flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
-                    <h2 className="text-3xl font-bold text-slate-900 mb-2 text-center">Business Model</h2>
-                    <p className="text-slate-500 text-center mb-8">How do you operate your automotive business?</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto w-full">
-                       <button
-                          onClick={() => { setConfig({ ...config, subType: 'rental' }); setStep('details'); }}
-                          className="p-8 border-2 border-slate-100 rounded-3xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group flex flex-col gap-4 bg-white shadow-sm hover:shadow-md"
-                       >
-                          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                             <Key size={32} />
-                          </div>
-                          <div>
-                             <h3 className="text-xl font-bold text-slate-900 mb-1">Rent-a-Car</h3>
-                             <p className="text-sm text-slate-500">I rent out vehicles on a daily or weekly basis.</p>
-                          </div>
-                       </button>
+              <div className="w-full max-w-sm">
+                <input
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  className="w-full px-4 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 outline-none text-lg tracking-widest text-center"
+                />
+              </div>
 
-                       <button
-                          onClick={() => { setConfig({ ...config, subType: 'sale' }); setStep('details'); }}
-                          className="p-8 border-2 border-slate-100 rounded-3xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group flex flex-col gap-4 bg-white shadow-sm hover:shadow-md"
-                       >
-                          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                             <Tag size={32} />
-                          </div>
-                          <div>
-                             <h3 className="text-xl font-bold text-slate-900 mb-1">Car Dealership</h3>
-                             <p className="text-sm text-slate-500">I sell new or used vehicles.</p>
-                          </div>
-                       </button>
-                    </div>
-                    
-                    <div className="mt-auto text-center">
-                       <button onClick={() => setStep('domain_select')} className="text-slate-400 hover:text-slate-600 text-sm font-medium">Back</button>
-                    </div>
-                 </div>
-              )}
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setStep("confirm")}
+                  disabled={isClaiming}
+                  className="px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleConfirmOtp}
+                  disabled={isClaiming || otpCode.trim().length < 4}
+                  className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isClaiming ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} />
+                      Verify & Claim
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
-              {step === 'details' && (
-                 <div className="p-12 flex flex-col items-center justify-center flex-1 animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="w-full max-w-md">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-2 text-center">Name Your Business</h2>
-                        <p className="text-slate-500 text-center mb-8">This is how customers will see you on the marketplace.</p>
-                        
-                        <div className="space-y-6 mb-10">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Business Name</label>
-                              <input 
-                                type="text" 
-                                value={config.businessName}
-                                onChange={(e) => setConfig({ ...config, businessName: e.target.value })}
-                                className="w-full p-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 outline-none text-lg font-medium transition-all placeholder:text-slate-300"
-                                placeholder={config.domain === 'Cars' ? "Kyrenia Rent A Car" : "Kyrenia Luxury Estates"}
-                                autoFocus
-                              />
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-4">
-                          <button 
-                              onClick={() => setStep(config.domain === 'Cars' ? 'sub_type' : 'domain_select')} 
-                              className="flex-1 py-4 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
-                          >
-                              Back
-                          </button>
-                          <button 
-                              onClick={handleFinish}
-                              disabled={!config.businessName}
-                              className="flex-[2] py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all shadow-lg"
-                          >
-                              Open Dashboard
-                          </button>
-                        </div>
-                    </div>
-                 </div>
-              )}
-           </div>
+          {/* SUCCESS STEP */}
+          {step === "success" && (
+            <div className="p-12 flex flex-col items-center justify-center flex-1 animate-in fade-in zoom-in duration-500">
+              <div className="w-24 h-24 bg-green-500 text-white rounded-full flex items-center justify-center mb-8 shadow-lg">
+                <Check size={48} />
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900 mb-4 text-center">
+                Business Claimed!
+              </h2>
+              <p className="text-slate-500 text-center mb-4">
+                Welcome to your AI-powered business dashboard.
+              </p>
+              <div className="flex items-center gap-2 text-slate-400">
+                <Loader2 size={16} className="animate-spin" />
+                Loading your dashboard...
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
   );
 };
 

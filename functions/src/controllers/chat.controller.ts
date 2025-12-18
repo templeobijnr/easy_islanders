@@ -1,3 +1,4 @@
+import * as logger from "firebase-functions/logger";
 import { Request, Response } from "express";
 import { GoogleGenerativeAI, FunctionCallingMode } from "@google/generative-ai";
 import { ALL_TOOL_DEFINITIONS } from "../utils/tools";
@@ -29,7 +30,7 @@ const getGenAI = () => {
 import { getSystemInstruction } from "../utils/systemPrompts";
 
 export const handleChatMessage = async (req: Request, res: Response) => {
-  console.log("🟦 [Backend] Received chat request");
+  logger.debug("🟦 [Backend] Received chat request");
   const { message, agentId, language, sessionId: clientSessionId } = req.body;
   const user = (req as any).user!;
 
@@ -49,7 +50,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       cleanMessage =
         message.replace(locationMatch[0], "").trim() ||
         "User shared their current location";
-      console.log("📍 [Backend] User location extracted:", userLocation);
+      logger.debug("📍 [Backend] User location extracted:", userLocation);
     }
 
     // 1. Session & Context Loading (Parallel)
@@ -369,13 +370,13 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             ${userLocation ? `- IMPORTANT: User has shared their current location (${userLocation.lat}, ${userLocation.lng}). When calling dispatchTaxi, include pickupLat and pickupLng with these exact values.` : ""}
         `;
 
-    console.log("🟦 [Backend] Initializing Gemini...");
+    logger.debug("🟦 [Backend] Initializing Gemini...");
 
     // 3. Initialize Model with History
     // Use v1beta API for experimental models with tool support
     const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash-exp";
-    console.log(`🤖 Using model: ${modelName}`);
-    console.log(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
+    logger.debug(`🤖 Using model: ${modelName}`);
+    logger.debug(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
 
     const model = getGenAI().getGenerativeModel(
       {
@@ -405,7 +406,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       history: validHistory,
     });
 
-    console.log("🟦 [Backend] Sending message to Gemini:", cleanMessage);
+    logger.debug("🟦 [Backend] Sending message to Gemini:", cleanMessage);
 
     // 4. Send Message & Handle Multi-Turn Loop
     let result = await chat.sendMessage(cleanMessage);
@@ -425,7 +426,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       try {
         const thinking = response.text();
         if (thinking) {
-          console.log("🧠 [Backend] Agent Thinking:", thinking);
+          logger.debug("🧠 [Backend] Agent Thinking:", thinking);
         }
       } catch (e) {
         // Ignore if no text is present with the function call
@@ -436,7 +437,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       for (const call of functionCalls) {
         const fnName = call.name;
         const fnArgs = call.args;
-        console.log(
+        logger.debug(
           `🛠️ [Backend] Decision: calling tool '${fnName}' with args ${JSON.stringify(fnArgs)}`,
         );
 
@@ -551,7 +552,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             ) {
               enrichedArgs.pickupLat = locationForTaxi.lat;
               enrichedArgs.pickupLng = locationForTaxi.lng;
-              console.log(
+              logger.debug(
                 `📍 [Backend] Auto-injected user location into ${fnName}:`,
                 locationForTaxi,
               );
@@ -574,7 +575,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             // Capture requestId for frontend tracking
             if (toolResult.success && toolResult.requestId) {
               taxiRequestId = toolResult.requestId;
-              console.log(
+              logger.debug(
                 `🚕 [Backend] Captured taxi requestId: ${taxiRequestId}`,
               );
             }
@@ -608,7 +609,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
                 : await resolver(fnArgs);
           }
 
-          console.log(
+          logger.debug(
             `   Result:`,
             JSON.stringify(toolResult).substring(0, 200) +
               (JSON.stringify(toolResult).length > 200 ? "..." : ""),
@@ -635,7 +636,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       }
 
       // Send tool outputs back to Gemini
-      console.log("🟦 [Backend] Sending tool outputs back to Gemini...");
+      logger.debug("🟦 [Backend] Sending tool outputs back to Gemini...");
       result = await chat.sendMessage(functionResponseParts);
       response = await result.response;
       functionCalls = response.functionCalls();
@@ -648,7 +649,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
     let text = "";
     try {
       text = response.text();
-      console.log("🟢 [Backend] Final Gemini response:", text);
+      logger.debug("🟢 [Backend] Final Gemini response:", text);
     } catch (textError: any) {
       console.error(
         "⚠️ [Backend] Error getting response text:",
@@ -656,7 +657,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       );
 
       // Log raw response for debugging
-      console.log(
+      logger.debug(
         "🔍 [Backend] Raw response candidates:",
         JSON.stringify(
           {
@@ -715,7 +716,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       ),
     ]);
 
-    console.log(
+    logger.debug(
       "📤 [Backend] Sending response. Has mapLocation?",
       !!mapLocation,
       mapLocation,
@@ -741,7 +742,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
 
 export const reindexListings = async (req: Request, res: Response) => {
   try {
-    console.log("🔄 [Reindex] Starting manual reindex...");
+    logger.debug("🔄 [Reindex] Starting manual reindex...");
     const { upsertListing, initializeCollection } =
       await import("../services/typesense.service");
     const { listingRepository } =
@@ -754,12 +755,12 @@ export const reindexListings = async (req: Request, res: Response) => {
 
     const domainFilter =
       typeof req.query.domain === "string" ? req.query.domain : undefined;
-    console.log(`[Reindex] Domain filter: ${domainFilter || "ALL"}`);
+    logger.debug(`[Reindex] Domain filter: ${domainFilter || "ALL"}`);
 
     const allItems = await listingRepository.getAllActive(
       domainFilter ? { domain: domainFilter } : undefined,
     ); // Get filtered or ALL items
-    console.log(`🔄 [Reindex] Found ${allItems.length} items in Firestore.`);
+    logger.debug(`🔄 [Reindex] Found ${allItems.length} items in Firestore.`);
 
     let count = 0;
     for (const item of allItems) {
@@ -797,7 +798,7 @@ export const reindexListings = async (req: Request, res: Response) => {
       count++;
     }
 
-    console.log(`✅ [Reindex] Successfully indexed ${count} items.`);
+    logger.debug(`✅ [Reindex] Successfully indexed ${count} items.`);
     res.json({ success: true, count });
   } catch (error) {
     console.error("🔴 [Reindex] Error:", error);

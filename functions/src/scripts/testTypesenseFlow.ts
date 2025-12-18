@@ -1,5 +1,6 @@
-import { db } from '../config/firebase';
-import * as typesenseService from '../services/typesense.service';
+import * as logger from "firebase-functions/logger";
+import { db } from "../config/firebase";
+import * as typesenseService from "../services/typesense.service";
 
 /**
  * Test the complete Firestore → Typesense flow
@@ -9,148 +10,156 @@ import * as typesenseService from '../services/typesense.service';
  * 4. Search for the listing
  */
 export async function testTypesenseFlow() {
-    console.log('🧪 Testing Typesense Flow...\n');
+  logger.debug("🧪 Testing Typesense Flow...\n");
 
-    try {
-        // Step 1: Initialize Typesense collection
-        console.log('1️⃣ Initializing Typesense collection...');
-        await typesenseService.initializeCollection();
-        console.log('✅ Typesense collection initialized\n');
+  try {
+    // Step 1: Initialize Typesense collection
+    logger.debug("1️⃣ Initializing Typesense collection...");
+    await typesenseService.initializeCollection();
+    logger.debug("✅ Typesense collection initialized\n");
 
-        // Step 2: Create test listings in Firestore (one per domain)
-        console.log('2️⃣ Creating test listings in Firestore...');
+    // Step 2: Create test listings in Firestore (one per domain)
+    logger.debug("2️⃣ Creating test listings in Firestore...");
 
-        const testListings = [
-            {
-                id: 'test-realestate-1',
-                domain: 'Real Estate',
-                title: 'Luxury Villa in Kyrenia',
-                description: 'Beautiful 4-bedroom villa with sea view',
-                price: 250000,
-                currency: 'GBP',
-                location: 'Kyrenia',
-                rating: 4.8,
-                ownerUid: 'test-user-1',
-                rentalType: 'sale',
-                bedrooms: 4,
-                bathrooms: 3,
-                squareMeters: 200,
-                amenities: ['Pool', 'Garden', 'Sea View'],
-                status: 'active'
-            },
-            {
-                id: 'test-car-1',
-                domain: 'Cars',
-                title: '2022 Toyota Corolla',
-                description: 'Reliable automatic sedan for rent',
-                price: 35,
-                currency: 'GBP',
-                location: 'Famagusta',
-                rating: 4.5,
-                ownerUid: 'test-user-2',
-                type: 'rental',
-                make: 'Toyota',
-                model: 'Corolla',
-                year: 2022,
-                transmission: 'Automatic',
-                fuelType: 'Petrol',
-                seats: 5,
-                status: 'active'
-            },
-            {
-                id: 'test-event-1',
-                domain: 'Events',
-                title: 'Summer Music Festival',
-                description: 'Amazing outdoor concert in Bellapais',
-                price: 45,
-                currency: 'GBP',
-                location: 'Bellapais',
-                rating: 4.9,
-                ownerUid: 'test-user-3',
-                eventType: 'Concert',
-                date: '2025-07-15',
-                venue: 'Bellapais Abbey',
-                totalTickets: 500,
-                ticketsAvailable: 350,
-                status: 'active'
-            }
-        ];
+    const testListings = [
+      {
+        id: "test-realestate-1",
+        domain: "Real Estate",
+        title: "Luxury Villa in Kyrenia",
+        description: "Beautiful 4-bedroom villa with sea view",
+        price: 250000,
+        currency: "GBP",
+        location: "Kyrenia",
+        rating: 4.8,
+        ownerUid: "test-user-1",
+        rentalType: "sale",
+        bedrooms: 4,
+        bathrooms: 3,
+        squareMeters: 200,
+        amenities: ["Pool", "Garden", "Sea View"],
+        status: "active",
+      },
+      {
+        id: "test-car-1",
+        domain: "Cars",
+        title: "2022 Toyota Corolla",
+        description: "Reliable automatic sedan for rent",
+        price: 35,
+        currency: "GBP",
+        location: "Famagusta",
+        rating: 4.5,
+        ownerUid: "test-user-2",
+        type: "rental",
+        make: "Toyota",
+        model: "Corolla",
+        year: 2022,
+        transmission: "Automatic",
+        fuelType: "Petrol",
+        seats: 5,
+        status: "active",
+      },
+      {
+        id: "test-event-1",
+        domain: "Events",
+        title: "Summer Music Festival",
+        description: "Amazing outdoor concert in Bellapais",
+        price: 45,
+        currency: "GBP",
+        location: "Bellapais",
+        rating: 4.9,
+        ownerUid: "test-user-3",
+        eventType: "Concert",
+        date: "2025-07-15",
+        venue: "Bellapais Abbey",
+        totalTickets: 500,
+        ticketsAvailable: 350,
+        status: "active",
+      },
+    ];
 
-        for (const listing of testListings) {
-            await db.collection('listings').doc(listing.id).set({
-                ...listing,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            });
-            console.log(`✅ Created ${listing.domain} listing: ${listing.title}`);
-        }
-        console.log('');
-
-        // Step 3: Manually index to Typesense
-        console.log('3️⃣ Indexing listings to Typesense...');
-        for (const listing of testListings) {
-            await typesenseService.upsertListing({
-                ...listing,
-                createdAt: { seconds: Math.floor(Date.now() / 1000) }
-            });
-            console.log(`✅ Indexed to Typesense: ${listing.title}`);
-        }
-        console.log('');
-
-        // Step 4: Search in Typesense
-        console.log('4️⃣ Testing Typesense search...');
-
-        // Search for villa
-        const villaResults = await typesenseService.searchListings({
-            query: 'villa',
-            domain: 'Real Estate'
+    for (const listing of testListings) {
+      await db
+        .collection("listings")
+        .doc(listing.id)
+        .set({
+          ...listing,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
-        console.log(`🔍 Search "villa" in Real Estate: Found ${villaResults.found} results`);
-        if (villaResults.hits.length > 0) {
-            console.log(`   - ${villaResults.hits[0].title}`);
-        }
-
-        // Search for Toyota
-        const carResults = await typesenseService.searchListings({
-            query: 'Toyota',
-            domain: 'Cars'
-        });
-        console.log(`🔍 Search "Toyota" in Cars: Found ${carResults.found} results`);
-        if (carResults.hits.length > 0) {
-            console.log(`   - ${carResults.hits[0].title}`);
-        }
-
-        // Search for concert
-        const eventResults = await typesenseService.searchListings({
-            query: 'concert',
-            domain: 'Events'
-        });
-        console.log(`🔍 Search "concert" in Events: Found ${eventResults.found} results`);
-        if (eventResults.hits.length > 0) {
-            console.log(`   - ${eventResults.hits[0].title}`);
-        }
-
-        console.log('\n✅ All tests passed! Typesense flow is working correctly.');
-        return {
-            success: true,
-            message: 'Typesense flow test completed successfully'
-        };
-
-    } catch (error) {
-        console.error('❌ Test failed:', error);
-        throw error;
+      logger.debug(`✅ Created ${listing.domain} listing: ${listing.title}`);
     }
+    logger.debug("");
+
+    // Step 3: Manually index to Typesense
+    logger.debug("3️⃣ Indexing listings to Typesense...");
+    for (const listing of testListings) {
+      await typesenseService.upsertListing({
+        ...listing,
+        createdAt: { seconds: Math.floor(Date.now() / 1000) },
+      });
+      logger.debug(`✅ Indexed to Typesense: ${listing.title}`);
+    }
+    logger.debug("");
+
+    // Step 4: Search in Typesense
+    logger.debug("4️⃣ Testing Typesense search...");
+
+    // Search for villa
+    const villaResults = await typesenseService.searchListings({
+      query: "villa",
+      domain: "Real Estate",
+    });
+    logger.debug(
+      `🔍 Search "villa" in Real Estate: Found ${villaResults.found} results`,
+    );
+    if (villaResults.hits.length > 0) {
+      logger.debug(`   - ${villaResults.hits[0].title}`);
+    }
+
+    // Search for Toyota
+    const carResults = await typesenseService.searchListings({
+      query: "Toyota",
+      domain: "Cars",
+    });
+    logger.debug(
+      `🔍 Search "Toyota" in Cars: Found ${carResults.found} results`,
+    );
+    if (carResults.hits.length > 0) {
+      logger.debug(`   - ${carResults.hits[0].title}`);
+    }
+
+    // Search for concert
+    const eventResults = await typesenseService.searchListings({
+      query: "concert",
+      domain: "Events",
+    });
+    logger.debug(
+      `🔍 Search "concert" in Events: Found ${eventResults.found} results`,
+    );
+    if (eventResults.hits.length > 0) {
+      logger.debug(`   - ${eventResults.hits[0].title}`);
+    }
+
+    logger.debug("\n✅ All tests passed! Typesense flow is working correctly.");
+    return {
+      success: true,
+      message: "Typesense flow test completed successfully",
+    };
+  } catch (error) {
+    console.error("❌ Test failed:", error);
+    throw error;
+  }
 }
 
 // CLI runner
 if (require.main === module) {
-    testTypesenseFlow()
-        .then(() => {
-            console.log('✅ Test completed');
-            process.exit(0);
-        })
-        .catch(error => {
-            console.error('❌ Test failed:', error);
-            process.exit(1);
-        });
+  testTypesenseFlow()
+    .then(() => {
+      logger.debug("✅ Test completed");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("❌ Test failed:", error);
+      process.exit(1);
+    });
 }

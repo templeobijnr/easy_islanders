@@ -9,87 +9,100 @@
  * npx ts-node -r esbuild-register src/scripts/testTaxiDispatch.ts
  */
 
-import { toolResolvers } from '../services/toolService';
+import * as logger from "firebase-functions/logger";
+import { toolResolvers } from "../services/agent/tool.service";
 
 async function testTaxiDispatch() {
-    console.log('🚕 ═══════════════════════════════════════════════════');
-    console.log('🚕   Testing Taxi Dispatch with Real WhatsApp');
-    console.log('🚕 ═══════════════════════════════════════════════════\n');
+  logger.debug("🚕 ═══════════════════════════════════════════════════");
+  logger.debug("🚕   Testing Taxi Dispatch with Real WhatsApp");
+  logger.debug("🚕 ═══════════════════════════════════════════════════\n");
 
-    // Test 1: Kyrenia Marina Pickup (Should select Kyrenia Premium Taxi)
-    console.log('📍 Test 1: Kyrenia Marina to Bellapais\n');
+  // Test 1: Kyrenia Marina Pickup (Should select Kyrenia Premium Taxi)
+  logger.debug("📍 Test 1: Kyrenia Marina to Bellapais\n");
 
-    try {
-        const result = await toolResolvers.dispatchTaxi({
-            pickupLocation: 'Kyrenia Marina',
-            destination: 'Bellapais Abbey',
-            pickupLat: 35.3369,
-            pickupLng: 33.3249,
-            // Note: destinationLat/Lng removed - not needed in new system
-            customerContact: 'whatsapp:+905488639394', // Your test number
-            customerName: 'City OS Test User',
-            notes: 'This is a test dispatch from City OS'
-        }, 'test-user-123');
+  try {
+    const result = await toolResolvers.dispatchTaxi(
+      {
+        pickupLocation: "Kyrenia Marina",
+        destination: "Bellapais Abbey",
+        pickupLat: 35.3369,
+        pickupLng: 33.3249,
+        // Note: destinationLat/Lng removed - not needed in new system
+        customerContact: "whatsapp:+905488639394", // Your test number
+        customerName: "City OS Test User",
+        notes: "This is a test dispatch from City OS",
+      },
+      "test-user-123",
+    );
 
-        console.log('\n✅ Taxi Dispatch Result:');
-        console.log(JSON.stringify(result, null, 2));
+    logger.debug("\n✅ Taxi Dispatch Result:");
+    logger.debug(JSON.stringify(result, null, 2));
 
-        if (result.success) {
-            console.log('\n🎉 SUCCESS!');
-            console.log(`📱 WhatsApp sent to taxi driver: ${result.booking.taxiInfo?.name}`);
-            console.log(`🚗 Vehicle: ${result.booking.taxiInfo?.vehicle}`);
-            console.log(`🔢 Plate: ${result.booking.taxiInfo?.plateNumber}`);
-            console.log(`⭐ Rating: ${result.booking.taxiInfo?.rating}/5`);
-            console.log(`\n💬 Check your WhatsApp (+905488639394) for the booking request!`);
-            console.log(`\n📲 To test bi-directional sync:`);
-            console.log(`   1. Reply "OK, 5 minutes" via WhatsApp`);
-            console.log(`   2. Check the booking status in Firestore (taxiBookings collection)`);
-            console.log(`   3. The webhook will update the status automatically`);
-        } else {
-            console.log('\n❌ FAILED:');
-            console.log(result.error);
-        }
-    } catch (error) {
-        console.error('\n❌ Error:', error);
+    if (result.success) {
+      logger.debug("\n🎉 SUCCESS!");
+      logger.debug(
+        `📱 WhatsApp sent to taxi driver: ${result.booking.taxiInfo?.name}`,
+      );
+      logger.debug(`🚗 Vehicle: ${result.booking.taxiInfo?.vehicle}`);
+      logger.debug(`🔢 Plate: ${result.booking.taxiInfo?.plateNumber}`);
+      logger.debug(`⭐ Rating: ${result.booking.taxiInfo?.rating}/5`);
+      logger.debug(
+        `\n💬 Check your WhatsApp (+905488639394) for the booking request!`,
+      );
+      logger.debug(`\n📲 To test bi-directional sync:`);
+      logger.debug(`   1. Reply "OK, 5 minutes" via WhatsApp`);
+      logger.debug(
+        `   2. Check the booking status in Firestore (taxiBookings collection)`,
+      );
+      logger.debug(`   3. The webhook will update the status automatically`);
+    } else {
+      logger.debug("\n❌ FAILED:");
+      logger.debug(result.error);
     }
+  } catch (error) {
+    console.error("\n❌ Error:", error);
+  }
 
-    console.log('\n───────────────────────────────────────────────────────\n');
+  logger.debug("\n───────────────────────────────────────────────────────\n");
 
-    // Test 2: Generic request (Should select any available taxi)
-    console.log('📍 Test 2: Generic Taxi Request (Airport)\n');
+  // Test 2: Generic request (Should select any available taxi)
+  logger.debug("📍 Test 2: Generic Taxi Request (Airport)\n");
 
-    try {
-        const result2 = await toolResolvers.dispatchTaxi({
-            pickupLocation: 'Ercan Airport',
-            destination: 'Kyrenia Center',
-            customerContact: 'whatsapp:+905488639394',
-            customerName: 'Airport Passenger',
-            notes: 'Luggage: 2 suitcases'
-        }, 'test-user-456');
+  try {
+    const result2 = await toolResolvers.dispatchTaxi(
+      {
+        pickupLocation: "Ercan Airport",
+        destination: "Kyrenia Center",
+        customerContact: "whatsapp:+905488639394",
+        customerName: "Airport Passenger",
+        notes: "Luggage: 2 suitcases",
+      },
+      "test-user-456",
+    );
 
-        console.log('\n✅ Taxi Dispatch Result:');
-        console.log(JSON.stringify(result2, null, 2));
+    logger.debug("\n✅ Taxi Dispatch Result:");
+    logger.debug(JSON.stringify(result2, null, 2));
 
-        if (result2.success) {
-            console.log('\n🎉 SUCCESS!');
-            console.log(`📱 WhatsApp sent to: ${result2.booking.taxiInfo?.name}`);
-            console.log(`🚗 Vehicle: ${result2.booking.taxiInfo?.vehicle}`);
-        }
-    } catch (error) {
-        console.error('\n❌ Error:', error);
+    if (result2.success) {
+      logger.debug("\n🎉 SUCCESS!");
+      logger.debug(`📱 WhatsApp sent to: ${result2.booking.taxiInfo?.name}`);
+      logger.debug(`🚗 Vehicle: ${result2.booking.taxiInfo?.vehicle}`);
     }
+  } catch (error) {
+    console.error("\n❌ Error:", error);
+  }
 
-    console.log('\n🏁 ═══════════════════════════════════════════════════');
-    console.log('🏁   Test Complete!');
-    console.log('🏁 ═══════════════════════════════════════════════════\n');
+  logger.debug("\n🏁 ═══════════════════════════════════════════════════");
+  logger.debug("🏁   Test Complete!");
+  logger.debug("🏁 ═══════════════════════════════════════════════════\n");
 
-    process.exit(0);
+  process.exit(0);
 }
 
 // Run the test
 if (require.main === module) {
-    testTaxiDispatch().catch(err => {
-        console.error('Fatal error:', err);
-        process.exit(1);
-    });
+  testTaxiDispatch().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
 }
