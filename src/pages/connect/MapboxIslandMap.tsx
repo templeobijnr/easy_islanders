@@ -2,6 +2,7 @@ import { logger } from "@/utils/logger";
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { v1ApiUrl } from "@/config/api";
 import {
   MapPin,
   Navigation,
@@ -29,9 +30,6 @@ import {
 
 // Ensure tokens are available
 const MAPBOX_TOKEN = (import.meta as any).env.VITE_MAPBOX_TOKEN;
-const API_URL =
-  (import.meta as any).env.VITE_API_URL ||
-  "http://localhost:5001/easy-islanders/europe-west1/api/v1";
 
 interface MapboxIslandMapProps {
   currentUser: SocialUser;
@@ -141,7 +139,7 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
   const fetchPlaces = async () => {
     try {
       logger.debug("📍 [Map] Fetching places from backend API...");
-      const res = await fetch(`${API_URL}/places?cityId=north-cyprus`);
+      const res = await fetch(v1ApiUrl("/places?cityId=north-cyprus"));
       const data = await res.json();
 
       if (data.success && data.places) {
@@ -165,7 +163,9 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
     try {
       const center = map.current.getCenter();
       const res = await fetch(
-        `${API_URL}/users/nearby?lat=${center.lat}&lng=${center.lng}&radius=5000`,
+        v1ApiUrl(
+          `/users/nearby?lat=${center.lat}&lng=${center.lng}&radius=5000`,
+        ),
         {
           headers: {
             // 'Authorization': `Bearer ${token}` // In real app
@@ -183,7 +183,7 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
 
   const handleWaveAtUser = async (targetUserId: string) => {
     try {
-      await fetch(`${API_URL}/users/wave`, {
+      await fetch(v1ApiUrl("/users/wave"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetUserId }),

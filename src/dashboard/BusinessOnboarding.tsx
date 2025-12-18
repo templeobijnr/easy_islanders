@@ -28,6 +28,7 @@ import {
   RecaptchaVerifier,
   linkWithCredential,
 } from "firebase/auth";
+import { v1ApiUrl } from "@/config/api";
 
 interface BusinessOnboardingProps {
   onComplete: (config: BusinessConfig) => void;
@@ -149,15 +150,6 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
     setStep("confirm");
   };
 
-  const getV1GatewayBase = () => {
-    let base =
-      import.meta.env.VITE_API_URL ||
-      "http://localhost:5001/easy-islanders/europe-west1/api";
-    base = base.replace(/\/+$/, "").replace(/\/v1$/, "");
-    if (base.endsWith("/api")) base = base.replace(/\/api$/, "/apiV1");
-    return base;
-  };
-
   const getAuthToken = async () => {
     if (!firebaseUser) return null;
     return firebaseUser.getIdToken();
@@ -173,7 +165,7 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
       if (!token) throw new Error("AUTH_REQUIRED");
 
       // 1) Start claim on server (pending) and get the phone to verify.
-      const startRes = await fetch(`${getV1GatewayBase()}/v1/claim/start`, {
+      const startRes = await fetch(v1ApiUrl("/claim/start"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -206,17 +198,14 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
           "[DEV MODE] Skipping phone verification, using dev bypass",
         );
         // Use dev bypass endpoint instead of phone verification
-        const bypassRes = await fetch(
-          `${getV1GatewayBase()}/v1/claim/dev-bypass`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ businessId: selectedPlace.id }),
+        const bypassRes = await fetch(v1ApiUrl("/claim/dev-bypass"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-        );
+          body: JSON.stringify({ businessId: selectedPlace.id }),
+        });
 
         const bypassJson = await bypassRes.json().catch(() => ({}));
         if (!bypassRes.ok) {
@@ -276,7 +265,7 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
       const token = await getAuthToken();
       if (!token) throw new Error("AUTH_REQUIRED");
 
-      const confirmRes = await fetch(`${getV1GatewayBase()}/v1/claim/confirm`, {
+      const confirmRes = await fetch(v1ApiUrl("/claim/confirm"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
