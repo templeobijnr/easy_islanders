@@ -2,15 +2,15 @@
 import React from 'react';
 import { Calendar, ChevronRight, MapPin, Trophy } from 'lucide-react';
 import { SocialUser, EventItem } from '../../types';
+import { formatDate } from '../../utils/formatters';
 
 interface RadarProps {
    topExplorers: SocialUser[];
    upcomingEvents: EventItem[];
-   onWave: (user: SocialUser) => void;
    onGetTickets: (event: EventItem) => void;
 }
 
-const Radar: React.FC<RadarProps> = ({ topExplorers, upcomingEvents, onWave, onGetTickets }) => {
+const Radar: React.FC<RadarProps> = ({ topExplorers, upcomingEvents, onGetTickets }) => {
    return (
       <div className="space-y-6">
 
@@ -34,12 +34,6 @@ const Radar: React.FC<RadarProps> = ({ topExplorers, upcomingEvents, onWave, onG
                            <span className="text-yellow-600 font-bold">{user.vouches} vouches</span>
                         </div>
                      </div>
-                     <button
-                        onClick={() => onWave(user)}
-                        className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg hover:bg-teal-100 transition-colors"
-                     >
-                        Wave 👋
-                     </button>
                   </div>
                ))}
             </div>
@@ -65,10 +59,10 @@ const Radar: React.FC<RadarProps> = ({ topExplorers, upcomingEvents, onWave, onG
                               <MapPin size={10} /> {evt.venue}
                            </div>
                         </div>
-                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded">
-                           {new Date(evt.date).getDate()} {new Date(evt.date).toLocaleString('default', { month: 'short' })}
-                        </div>
-                     </div>
+	                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded">
+	                           {formatDate(evt.date, { day: 'numeric' })} {formatDate(evt.date, { month: 'short' })}
+	                        </div>
+	                     </div>
                      <button
                         onClick={() => onGetTickets(evt)}
                         className="w-full py-2 text-xs font-bold text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"

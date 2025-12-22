@@ -8,10 +8,8 @@ import { memoryService } from "../services/memory.service";
 import { db } from "../config/firebase";
 import { getLiteContext } from "../services/user.service";
 import { transactionRepository } from "../repositories/transaction.repository";
-import {
-  createHeldBooking,
-  resolveBusinessId,
-} from "../services/tools/booking-ledger.tools";
+import { createHeldBooking, resolveBusinessId } from "../services/tools/booking-ledger.tools";
+import { getErrorMessage } from "../utils/errors";
 
 // Initialize Gemini lazily
 let genAI: GoogleGenerativeAI | null = null;
@@ -88,10 +86,10 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             },
             { merge: true },
           );
-      } catch (locErr: any) {
+      } catch (locErr: unknown) {
         console.error(
           "⚠️ [Backend] Failed to persist lastLocation:",
-          locErr.message || locErr,
+          getErrorMessage(locErr) || locErr,
         );
       }
     }
@@ -614,10 +612,12 @@ export const handleChatMessage = async (req: Request, res: Response) => {
             JSON.stringify(toolResult).substring(0, 200) +
               (JSON.stringify(toolResult).length > 200 ? "..." : ""),
           );
-        } catch (toolErr: any) {
-          const errorMessage = toolErr.message || "Unknown error occurred";
+        } catch (toolErr: unknown) {
+          const errorMessage = getErrorMessage(toolErr) || "Unknown error occurred";
           console.error(`🔴 [Backend] AI Controller Error: ${errorMessage}`);
-          console.error(`🔴 [Backend] Error stack:`, toolErr.stack);
+          if (toolErr instanceof Error && toolErr.stack) {
+            console.error(`🔴 [Backend] Error stack:`, toolErr.stack);
+          }
 
           // Return error details to the AI agent so it can handle it gracefully
           toolResult = {
@@ -650,10 +650,10 @@ export const handleChatMessage = async (req: Request, res: Response) => {
     try {
       text = response.text();
       logger.debug("🟢 [Backend] Final Gemini response:", text);
-    } catch (textError: any) {
+    } catch (textError: unknown) {
       console.error(
         "⚠️ [Backend] Error getting response text:",
-        textError.message,
+        getErrorMessage(textError),
       );
 
       // Log raw response for debugging
@@ -743,14 +743,15 @@ export const handleChatMessage = async (req: Request, res: Response) => {
 export const reindexListings = async (req: Request, res: Response) => {
   try {
     logger.debug("🔄 [Reindex] Starting manual reindex...");
-    const { upsertListing, initializeCollection } =
-      await import("../services/typesense.service");
-    const { listingRepository } =
-      await import("../repositories/listing.repository");
+    // NOTE: Use `require()` instead of dynamic `import()` to keep this code
+    // compatible with Jest's default VM execution environment (no vm module flags).
+    // This remains lazy-loaded (no module-scope side effects).
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { upsertListing, initializeCollection, initializeUserCollection } = require("../services/typesense.service");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { listingRepository } = require("../repositories/listing.repository");
 
     await initializeCollection();
-    const { initializeUserCollection } =
-      await import("../services/typesense.service");
     await initializeUserCollection();
 
     const domainFilter =

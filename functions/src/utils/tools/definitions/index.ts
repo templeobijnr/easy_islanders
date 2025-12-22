@@ -6,6 +6,7 @@ export * from "./taxi.tools";
 export * from "./consumerRequest.tools";
 export * from "./discovery.tools";
 export * from "./user.tools";
+export * from "./addressBook.tools";
 export * from "./tribes.tools";
 export * from "./socialPresence.tools";
 export * from "./itinerary.tools";

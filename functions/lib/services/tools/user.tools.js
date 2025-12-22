@@ -2,11 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userTools = void 0;
 const firebase_1 = require("../../config/firebase");
+const toolContext_1 = require("./toolContext");
 exports.userTools = {
     /**
      * Get user profile information
      */
-    getUserProfile: async (_args, userId) => {
+    getUserProfile: async (_args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -37,7 +40,9 @@ exports.userTools = {
     /**
      * Update user profile/preferences
      */
-    updateUserProfile: async (args, userId) => {
+    updateUserProfile: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -66,7 +71,9 @@ exports.userTools = {
     /**
      * Save an item to favorites
      */
-    saveFavoriteItem: async (args, userId) => {
+    saveFavoriteItem: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -94,7 +101,9 @@ exports.userTools = {
     /**
      * List user favorites
      */
-    listFavorites: async (_args, userId) => {
+    listFavorites: async (_args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,

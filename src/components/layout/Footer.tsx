@@ -2,7 +2,11 @@
 import React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 
-const Footer: React.FC = () => {
+interface FooterProps {
+  onAdminLogin?: () => void;
+}
+
+const Footer: React.FC<FooterProps> = ({ onAdminLogin }) => {
   const { t } = useLanguage();
 
   return (
@@ -16,31 +20,43 @@ const Footer: React.FC = () => {
             </p>
           </div>
           <div>
-             <h4 className="text-white font-semibold mb-4">{t('company')}</h4>
-             <ul className="space-y-2 text-sm">
-                <li className="hover:text-white cursor-pointer">About Us</li>
-                <li className="hover:text-white cursor-pointer">Careers</li>
-                <li className="hover:text-white cursor-pointer">Press</li>
-             </ul>
+            <h4 className="text-white font-semibold mb-4">{t('company')}</h4>
+            <ul className="space-y-2 text-sm">
+              <li className="hover:text-white cursor-pointer">About Us</li>
+              <li className="hover:text-white cursor-pointer">Careers</li>
+              <li className="hover:text-white cursor-pointer">Press</li>
+            </ul>
           </div>
           <div>
-             <h4 className="text-white font-semibold mb-4">{t('support')}</h4>
-             <ul className="space-y-2 text-sm">
-                <li className="hover:text-white cursor-pointer">{t('help')}</li>
-                <li className="hover:text-white cursor-pointer">Safety</li>
-                <li className="hover:text-white cursor-pointer">Cancellation Options</li>
-             </ul>
+            <h4 className="text-white font-semibold mb-4">{t('support')}</h4>
+            <ul className="space-y-2 text-sm">
+              <li className="hover:text-white cursor-pointer">{t('help')}</li>
+              <li className="hover:text-white cursor-pointer">Safety</li>
+              <li className="hover:text-white cursor-pointer">Cancellation Options</li>
+            </ul>
           </div>
           <div>
-             <h4 className="text-white font-semibold mb-4">{t('legal')}</h4>
-             <ul className="space-y-2 text-sm">
-                <li className="hover:text-white cursor-pointer">Terms of Service</li>
-                <li className="hover:text-white cursor-pointer">Privacy Policy</li>
-             </ul>
+            <h4 className="text-white font-semibold mb-4">{t('legal')}</h4>
+            <ul className="space-y-2 text-sm">
+              <li className="hover:text-white cursor-pointer">Terms of Service</li>
+              <li className="hover:text-white cursor-pointer">Privacy Policy</li>
+              <li
+                className="hover:text-white cursor-pointer"
+                onClick={(e) => {
+                  // Secret triple click to open admin login
+                  if (e.detail === 3) {
+                    onAdminLogin?.();
+                  }
+                }}
+              >
+                Cookie Policy
+              </li>
+            </ul>
           </div>
         </div>
-        <div className="text-center text-xs">
-          &copy; {new Date().getFullYear()} Easy Islanders. All rights reserved.
+        <div className="flex justify-between items-center text-xs">
+          <span>&copy; {new Date().getFullYear()} Easy Islanders. All rights reserved.</span>
+          {/* Admin access: Triple-click "Cookie Policy" or Ctrl+Shift+A */}
         </div>
       </div>
     </footer>

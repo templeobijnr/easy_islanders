@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errors';
 /**
  * Test script to debug taxi webhook
  * Simulates a driver replying "YES D2EU" to a taxi request
@@ -80,10 +81,12 @@ async function testWebhook() {
     logger.debug(`\n5️⃣ Request status after reply:`);
     logger.debug(`   Status: ${updatedData?.status}`);
     logger.debug(`   Assigned to: ${updatedData?.driverName || "N/A"}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`\n❌ Error in handleDriverReply:`, error);
-    console.error(`   Message: ${error.message}`);
-    console.error(`   Stack: ${error.stack}`);
+    console.error(`   Message: ${getErrorMessage(error)}`);
+    if (error instanceof Error && error.stack) {
+      console.error(`   Stack: ${error.stack}`);
+    }
   }
 
   logger.debug(`\n${"=".repeat(50)}\n`);

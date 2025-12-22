@@ -8,7 +8,8 @@ declare global {
             user?: {
                 uid: string;
                 email?: string;
-                role?: 'user' | 'business' | 'admin';
+                role?: 'user' | 'business' | 'owner' | 'admin';
+                businessId?: string;
             };
         }
     }
@@ -31,7 +32,8 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
             uid: decodedToken.uid,
             email: decodedToken.email,
             // We will set custom claims (roles) in a future script, defaulting to 'user' for now
-            role: (decodedToken.role as 'user' | 'business' | 'admin') || 'user'
+            role: (decodedToken.role as 'user' | 'business' | 'owner' | 'admin') || 'user',
+            businessId: decodedToken.businessId as string | undefined
         };
 
         next();

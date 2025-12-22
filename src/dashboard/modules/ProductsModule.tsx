@@ -11,7 +11,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { StorageService } from "../../services/storageService";
+import { StorageService } from "../../services/infrastructure/storage/local-storage.service";
 import { formatFixed } from "../../utils/formatters";
 import { v1ApiUrl } from "../../config/api";
 

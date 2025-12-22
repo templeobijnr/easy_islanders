@@ -7,7 +7,8 @@ import { sanitizeData } from './utils';
 const COLLECTIONS = {
   CLIENTS: 'clients',
   CAMPAIGNS: 'campaigns',
-  REQUESTS: 'requests'
+  REQUESTS: 'requests',
+  CONVERSATIONS: 'conversations'
 };
 
 const LOCAL_KEYS = {
@@ -18,7 +19,13 @@ export const CrmStorage = {
   getClients: async (): Promise<Client[]> => {
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTIONS.CLIENTS));
-      return querySnapshot.docs.map(doc => doc.data() as Client);
+      return querySnapshot.docs.map(doc => {
+        const data: any = doc.data();
+        return {
+          ...data,
+          tags: Array.isArray(data.tags) ? data.tags.filter((t: any) => typeof t === 'string') : [],
+        } as Client;
+      });
     } catch (error) {
       console.error("Error getting clients:", error);
       return [];
@@ -64,6 +71,27 @@ export const CrmStorage = {
     }
   },
 
+  // --- AGENT CONVERSATIONS ---
+  getConversations: async (businessId?: string): Promise<any[]> => {
+    try {
+      // In prod: query(collection(...), where('businessId', '==', businessId))
+      const q = query(collection(db, COLLECTIONS.CONVERSATIONS), orderBy('time', 'desc'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error("Error fetching conversations", error);
+      return [];
+    }
+  },
+
+  saveConversation: async (conversation: any): Promise<void> => {
+    try {
+      await setDoc(doc(db, COLLECTIONS.CONVERSATIONS, conversation.id), sanitizeData(conversation), { merge: true });
+    } catch (error) {
+      console.error("Error saving conversation", error);
+    }
+  },
+
   // --- BUSINESS CONFIG (Local) ---
   getBusinessConfig: async (): Promise<BusinessConfig | null> => {
     const stored = localStorage.getItem(LOCAL_KEYS.BUSINESS_CONFIG);
@@ -73,7 +101,7 @@ export const CrmStorage = {
   saveBusinessConfig: async (config: BusinessConfig): Promise<void> => {
     localStorage.setItem(LOCAL_KEYS.BUSINESS_CONFIG, JSON.stringify(config));
   },
-  
+
   clearBusinessConfig: async (): Promise<void> => {
     localStorage.removeItem(LOCAL_KEYS.BUSINESS_CONFIG);
   },

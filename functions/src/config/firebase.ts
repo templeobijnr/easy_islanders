@@ -1,9 +1,12 @@
 import * as admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
-admin.initializeApp();
+const storageBucket =
+  process.env.FIREBASE_STORAGE_BUCKET ??
+  process.env.STORAGE_BUCKET ??
+  (process.env.GCLOUD_PROJECT ? `${process.env.GCLOUD_PROJECT}.firebasestorage.app` : undefined);
 
-// Use default Firestore database (not 'easy-db')
-// If you have a custom database, switch back to: getFirestore(admin.app(), 'easy-db')
-export const db = getFirestore(admin.app());
+admin.initializeApp(storageBucket ? { storageBucket } : undefined);
+
+export const db = getFirestore(admin.app(), 'easy-db');
 export const auth = admin.auth();

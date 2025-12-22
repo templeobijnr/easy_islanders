@@ -40,13 +40,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.taxiTools = void 0;
 const firebase_1 = require("../../config/firebase");
+const toolContext_1 = require("./toolContext");
 exports.taxiTools = {
     /**
      * Request a taxi using the new atomic dispatch system
      */
-    requestTaxi: async (args, userId, sessionId) => {
+    requestTaxi: async (args, userIdOrContext, sessionId) => {
         console.log("🚕 [RequestTaxi] New System:", args);
         try {
+            const ctx = (0, toolContext_1.asToolContext)(userIdOrContext, sessionId);
+            const userId = ctx.userId;
             const { createAndBroadcastRequest } = await Promise.resolve().then(() => __importStar(require('../taxi.service')));
             const { reverseGeocode } = await Promise.resolve().then(() => __importStar(require('../../utils/reverseGeocode')));
             // Get user profile for contact info if not provided
@@ -99,7 +102,7 @@ exports.taxiTools = {
             if (args.priceEstimate !== undefined) {
                 requestData.priceEstimate = args.priceEstimate;
             }
-            const requestId = await createAndBroadcastRequest(requestData, sessionId);
+            const requestId = await createAndBroadcastRequest(requestData, ctx.sessionId);
             console.log(`✅ [RequestTaxi] Request created and broadcast: ${requestId}`);
             return {
                 success: true,
@@ -145,8 +148,9 @@ exports.taxiTools = {
      * Legacy dispatch function - redirects to new system
      * @deprecated Use requestTaxi instead
      */
-    dispatchTaxi: async (args, userId, sessionId) => {
+    dispatchTaxi: async (args, userIdOrContext, sessionId) => {
         console.log("🚖 [DispatchTaxi] Redirecting to new system...", args);
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext, sessionId);
         // Infer district from location string
         let district = 'Unknown';
         const locationLower = (args.pickupLocation || '').toLowerCase();
@@ -182,7 +186,7 @@ exports.taxiTools = {
             dropoffAddress: args.destination,
             customerName: args.customerName,
             customerPhone: args.customerContact,
-        }, userId, sessionId);
+        }, ctx, ctx.sessionId);
     }
 };
 //# sourceMappingURL=taxi.tools.js.map

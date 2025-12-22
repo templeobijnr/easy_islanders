@@ -11,16 +11,16 @@ const AboutSection: React.FC = () => {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-16">
-          
+
           {/* Left: Visuals */}
           <div className="w-full lg:w-1/2 relative">
             <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-200/50 transform hover:rotate-1 transition-transform duration-500">
-              <img 
-                src="https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?q=80&w=2566&auto=format&fit=crop" 
-                alt="Concierge" 
+              <img
+                src="https://images.unsplash.com/photo-1590665510909-c30f14541919?q=80&w=2670&auto=format&fit=crop"
+                alt="Bellapais Abbey"
                 className="w-full h-auto object-cover"
               />
-              
+
               {/* Floating Badge */}
               <div className="absolute bottom-8 right-8 bg-white/90 backdrop-blur-xl p-4 rounded-2xl shadow-lg border border-white/50 max-w-[200px] animate-float">
                 <div className="flex items-center gap-3 mb-2">
@@ -33,7 +33,7 @@ const AboutSection: React.FC = () => {
                 <p className="text-xs font-bold text-slate-700">Trusted by 2,000+ travelers this month.</p>
               </div>
             </div>
-            
+
             {/* Abstract Shapes */}
             <div className="absolute -top-4 -left-4 w-24 h-24 bg-orange-400 rounded-full opacity-20"></div>
             <div className="absolute -bottom-8 -right-8 w-48 h-48 border-4 border-teal-500/20 rounded-full"></div>
@@ -45,12 +45,12 @@ const AboutSection: React.FC = () => {
               The Islander Way
             </span>
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6 leading-tight">
-              Not a Search Engine. <br/>
+              Not a Search Engine. <br />
               <span className="text-teal-600">Your Local Friend.</span>
             </h2>
             <p className="text-lg text-slate-500 mb-8 leading-relaxed">
-              Traditional booking sites give you filters. We give you experts. 
-              Our AI agents are trained on local knowledge, hidden gems, and real-time availability, 
+              Traditional booking sites give you filters. We give you experts.
+              Our AI agents are trained on local knowledge, hidden gems, and real-time availability,
               giving you the "local connection" instantly.
             </p>
 

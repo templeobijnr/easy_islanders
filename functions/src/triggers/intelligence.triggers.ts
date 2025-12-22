@@ -9,9 +9,15 @@ import { UserIntelligence } from "../types/user";
 export const onMessageAnalyze = onDocumentCreated(
     {
         document: "chatSessions/{convId}/messages/{msgId}",
+        database: "easy-db",
         region: "europe-west1"
     },
     async (event) => {
+        if (!process.env.GEMINI_API_KEY) {
+            logger.info('[onMessageAnalyze] GEMINI_API_KEY not set; skipping profiling');
+            return;
+        }
+
         const data = event.data?.data();
         if (!data) return;
         if (data.role && data.role !== 'user') return;
@@ -43,9 +49,15 @@ export const onMessageAnalyze = onDocumentCreated(
 export const onIntelligenceSync = onDocumentWritten(
     {
         document: "users/{uid}/system/intelligence",
+        database: "easy-db",
         region: "europe-west1"
     },
     async (event) => {
+        if (!process.env.TYPESENSE_API_KEY) {
+            logger.info('[onIntelligenceSync] TYPESENSE_API_KEY not set; skipping Typesense sync');
+            return;
+        }
+
         const uid = event.params.uid;
         const data = event.data?.after.data() as UserIntelligence;
         if (!data) return;

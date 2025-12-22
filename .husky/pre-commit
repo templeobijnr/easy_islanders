@@ -1,0 +1,8 @@
+# Block commits of secret files
+if git diff --cached --name-only | grep -E '\.env.*backup|downloaded-logs|firestore-debug\.log'; then
+  echo "ERROR: Attempting to commit sensitive files!"
+  echo "Files blocked: $(git diff --cached --name-only | grep -E '\.env.*backup|downloaded-logs|firestore-debug\.log')"
+  exit 1
+fi
+
+pnpm exec lint-staged

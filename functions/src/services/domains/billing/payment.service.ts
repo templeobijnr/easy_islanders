@@ -3,10 +3,22 @@ import Stripe from "stripe";
 import "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../../../config/firebase";
+import { getErrorMessage } from '../../../utils/errors';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-12-15.clover",
-});
+// Lazily initialize Stripe so importing this module never crashes tests or cold-start paths.
+// Invariant: external clients must never be created at module scope.
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (_stripe) return _stripe;
+
+  const apiKey = process.env.STRIPE_SECRET_KEY;
+  if (!apiKey) {
+    throw new Error("Stripe not configured: STRIPE_SECRET_KEY is missing");
+  }
+
+  _stripe = new Stripe(apiKey, { apiVersion: "2025-12-15.clover" });
+  return _stripe;
+}
 
 export const paymentService = {
   // 1. Create Payment Intent (The "Invoice")
@@ -33,6 +45,7 @@ export const paymentService = {
     }
 
     // Create Intent
+    const stripe = getStripe();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(booking?.totalPrice * 100), // Stripe expects cents (e.g. £10.00 = 1000)
       currency: (booking?.currency || "gbp").toLowerCase(),
@@ -54,6 +67,7 @@ export const paymentService = {
 
   // 2. Handle Webhook (The "Receipt")
   handleWebhook: async (signature: string, rawBody: Buffer) => {
+    const stripe = getStripe();
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
     let event;
 
@@ -63,8 +77,8 @@ export const paymentService = {
         signature,
         endpointSecret!,
       );
-    } catch (err: any) {
-      console.error(`⚠️  Webhook signature verification failed.`, err.message);
+    } catch (err: unknown) {
+      console.error(`⚠️  Webhook signature verification failed.`, getErrorMessage(err));
       throw new Error("Webhook Error");
     }
 

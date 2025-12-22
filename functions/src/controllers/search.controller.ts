@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as typesenseService from '../services/typesense.service';
 import * as logger from 'firebase-functions/logger';
+import { getErrorMessage } from '../utils/errors';
 
 /**
  * Search listings using Typesense
@@ -42,11 +43,11 @@ export async function searchListings(req: Request, res: Response) {
             total: results.found,
             page: results.page
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         logger.error('❌ Search error:', error);
         res.status(500).json({
             success: false,
-            error: error.message || 'Search failed'
+            error: getErrorMessage(error) || 'Search failed'
         });
     }
 }

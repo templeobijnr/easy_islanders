@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import ListingCard from "../../components/shared/ListingCard";
-import BookingModal from "../../components/booking/BookingModal";
-import ProductDetailModal from "../../components/booking/ProductDetailModal";
+import { BookingModal, ProductDetailModal } from "../../components/shared/modals";
 import CollectionBanner from "./CollectionBanner";
 import FilterBar from "./FilterBar";
 import {
@@ -26,7 +25,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
-import { StorageService } from "../../services/storageService";
+import { StorageService } from "../../services/infrastructure/storage/local-storage.service";
 import { UnifiedListingsService } from "../../services/unifiedListingsService";
 
 const Explore: React.FC = () => {

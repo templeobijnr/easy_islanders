@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
 import { Request, Response } from "express";
 import { populateListingsChunked } from "../scripts/populateListings";
+import { getErrorMessage } from '../utils/errors';
 
 export const populateDatabase = async (req: Request, res: Response) => {
   try {
@@ -15,7 +16,7 @@ export const populateDatabase = async (req: Request, res: Response) => {
     console.error("❌ Error populating database:", error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? getErrorMessage(error) : "Unknown error",
     });
   }
 };

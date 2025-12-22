@@ -2,15 +2,65 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.miscTools = void 0;
 const firebase_1 = require("../../config/firebase");
+const places_repository_1 = require("../../repositories/places.repository");
+const mapbox_service_1 = require("../mapbox.service");
+const toolContext_1 = require("./toolContext");
+function parseLatLng(str) {
+    if (!str)
+        return null;
+    const parts = str.split(',').map(p => parseFloat(p.trim()));
+    if (parts.length !== 2 || parts.some(isNaN))
+        return null;
+    return { lat: parts[0], lng: parts[1] };
+}
+function toRad(deg) {
+    return (deg * Math.PI) / 180;
+}
+function haversineKm(a, b) {
+    const R = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const hav = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
+    return R * c;
+}
+function normalizePlaceCategory(domain) {
+    const d = (domain || '').toLowerCase().trim();
+    const direct = d;
+    const allowed = ['food', 'nightlife', 'sight', 'cafe', 'co_working', 'shopping', 'service', 'housing_project', 'other'];
+    if (allowed.includes(direct))
+        return direct;
+    if (d.includes('restaurant') || d.includes('food'))
+        return 'food';
+    if (d.includes('bar') || d.includes('club') || d.includes('night'))
+        return 'nightlife';
+    if (d.includes('cafe') || d.includes('coffee'))
+        return 'cafe';
+    if (d.includes('shop') || d.includes('mall'))
+        return 'shopping';
+    if (d.includes('service') || d.includes('plumber') || d.includes('electric') || d.includes('handyman'))
+        return 'service';
+    if (d.includes('sight') || d.includes('museum') || d.includes('beach') || d.includes('hike'))
+        return 'sight';
+    return null;
+}
 exports.miscTools = {
     /**
      * Create a consumer request for goods/services
      */
     createConsumerRequest: async (args) => {
         console.log("📝 [ConsumerRequest] Creating request:", args);
+        // Back-compat with the Gemini tool schema (`requestDetails`, `contactInfo`)
+        const requestDetails = args.requestDetails || args.content;
+        const contactInfo = args.contactInfo || args.domain;
         return {
             success: true,
-            requestId: `REQ-${Date.now()}`
+            requestId: `REQ-${Date.now()}`,
+            requestDetails: requestDetails || null,
+            contactInfo: contactInfo || null,
         };
     },
     /**
@@ -27,18 +77,103 @@ exports.miscTools = {
      * Consult the knowledge base encyclopedia
      */
     consultEncyclopedia: async (args) => {
-        console.log("📚 [Encyclopedia] Looking up:", args.topic);
+        const topic = args.topic || args.query || '';
+        console.log("📚 [Encyclopedia] Looking up:", topic);
         return {
             success: true,
-            content: `Knowledge lookup for "${args.topic}" is not yet connected to a live data source.`
+            content: `Knowledge lookup for "${topic}" is not yet connected to a live data source.`
+        };
+    },
+    /**
+     * Find nearby places using (1) shared GPS (if available) or (2) Mapbox geocoding,
+     * then filter the curated Firestore `places` collection by distance.
+     */
+    getNearbyPlaces: async (args, userIdOrContext) => {
+        var _a;
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const locationText = ((args === null || args === void 0 ? void 0 : args.location) || '').toString().trim();
+        const domain = ((args === null || args === void 0 ? void 0 : args.domain) || '').toString().trim();
+        const radiusKm = typeof (args === null || args === void 0 ? void 0 : args.radiusKm) === 'number' ? args.radiusKm : 5;
+        const limit = typeof (args === null || args === void 0 ? void 0 : args.limit) === 'number' ? args.limit : 20;
+        const currentLoc = ctx.location && typeof ctx.location === 'object'
+            ? { lat: ctx.location.lat, lng: ctx.location.lng }
+            : null;
+        let origin = parseLatLng(locationText) ||
+            ((/^(current location|near me|me)$/i.test(locationText) || !locationText) ? currentLoc : null);
+        if (!origin && locationText) {
+            try {
+                const geo = await (0, mapbox_service_1.searchMapboxPlaces)(locationText, { limit: 1, types: 'place,locality,address' });
+                if ((_a = geo[0]) === null || _a === void 0 ? void 0 : _a.center) {
+                    origin = { lat: geo[0].center[1], lng: geo[0].center[0] };
+                }
+            }
+            catch (e) {
+                // Network/token may not be available; fall back to text filtering
+            }
+        }
+        const category = normalizePlaceCategory(domain);
+        let places = await places_repository_1.placesRepository.getByCityId('north-cyprus', true);
+        if (category) {
+            places = places.filter(p => p.category === category);
+        }
+        // Distance filter if we have an origin; otherwise fall back to text filter
+        if (origin) {
+            const placesWithDistance = places
+                .filter(p => !!p.coordinates)
+                .map(p => (Object.assign(Object.assign({}, p), { distanceKm: haversineKm(origin, p.coordinates) })))
+                .filter(p => p.distanceKm <= radiusKm)
+                .sort((a, b) => a.distanceKm - b.distanceKm)
+                .slice(0, limit);
+            return {
+                success: true,
+                origin,
+                radiusKm,
+                count: placesWithDistance.length,
+                places: placesWithDistance.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    category: p.category,
+                    subcategory: p.subcategory,
+                    address: p.address,
+                    areaName: p.areaName,
+                    distanceKm: Math.round(p.distanceKm * 100) / 100,
+                    coordinates: p.coordinates,
+                    tags: p.tags,
+                })),
+            };
+        }
+        if (!locationText) {
+            return { success: false, error: 'location is required (or share GPS location)' };
+        }
+        const filtered = places
+            .filter(p => (p.areaName || '').toLowerCase().includes(locationText.toLowerCase()))
+            .slice(0, limit);
+        return {
+            success: true,
+            origin: null,
+            radiusKm: null,
+            count: filtered.length,
+            places: filtered.map(p => ({
+                id: p.id,
+                name: p.name,
+                category: p.category,
+                subcategory: p.subcategory,
+                address: p.address,
+                areaName: p.areaName,
+                coordinates: p.coordinates,
+                tags: p.tags,
+            })),
+            note: 'GPS/geocoding unavailable; results filtered by areaName match only.',
         };
     },
     /**
      * Household supplies / groceries order
      */
-    orderHouseholdSupplies: async (args, userId) => {
+    orderHouseholdSupplies: async (args, userIdOrContext) => {
         console.log("🛒 [OrderSupplies] New order:", args);
         try {
+            const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+            const userId = ctx.userId;
             // Get user profile for contact info if not provided
             let customerPhone = args.contactPhone || '';
             let customerName = args.customerName || 'Guest';
@@ -79,11 +214,13 @@ exports.miscTools = {
     /**
      * Service / handyman request
      */
-    requestService: async (args, userId) => {
+    requestService: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
         console.log("🔧 [RequestService] New request:", args);
         return {
             success: true,
-            requestId: `SRV-${Date.now()}`
+            requestId: `SRV-${Date.now()}`,
+            userId: ctx.userId || null,
         };
     },
     /**

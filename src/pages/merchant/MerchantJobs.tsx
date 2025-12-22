@@ -13,7 +13,7 @@ import {
   acceptJob,
   declineJob,
   type MerchantJob,
-} from "../../services/merchantApi";
+} from "../../services/integrations/merchant/merchant.api";
 import { formatDate } from "../../utils/formatters";
 
 // Inline helper to avoid @askmerve/shared dependency in frontend
@@ -283,7 +283,7 @@ const MerchantJobs: React.FC = () => {
     try {
       const updated = await acceptJob(jobId);
       setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
-    } catch (err: any) {
+    } catch (err: unknown) {
       alert(err.message || "Failed to accept job");
     } finally {
       setActionLoading(null);
@@ -295,7 +295,7 @@ const MerchantJobs: React.FC = () => {
     try {
       const updated = await declineJob(jobId);
       setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
-    } catch (err: any) {
+    } catch (err: unknown) {
       alert(err.message || "Failed to decline job");
     } finally {
       setActionLoading(null);

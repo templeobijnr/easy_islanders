@@ -5,6 +5,7 @@ import {
     Image as ImageIcon, UploadCloud, Check, DollarSign, 
     Share2, Globe, Instagram, Megaphone, Loader2, ArrowLeft
 } from 'lucide-react';
+import { formatNumber } from '../../utils/formatters';
 
 interface EventFormModalProps {
   isOpen: boolean;
@@ -375,7 +376,11 @@ const EventFormModal: React.FC<EventFormModalProps> = ({ isOpen, onClose, onSave
                               <h4 className="font-bold text-purple-900 mb-2">Estimated Revenue</h4>
                               <div className="text-3xl font-bold text-purple-700">
                                  {form.currency === 'GBP' ? '£' : form.currency}
-                                 {(form.price * form.capacity).toLocaleString()}
+                                 {formatNumber(
+                                    typeof form.price === 'number' && typeof form.capacity === 'number'
+                                      ? form.price * form.capacity
+                                      : null
+                                 )}
                               </div>
                               <p className="text-xs text-purple-600 mt-1">Based on {form.capacity} attendees at full capacity.</p>
                            </div>

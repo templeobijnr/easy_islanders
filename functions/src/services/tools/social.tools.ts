@@ -1,20 +1,92 @@
 import * as logger from "firebase-functions/logger";
 import { db } from "../../config/firebase";
 import { FieldValue } from "firebase-admin/firestore";
-import { asToolContext } from "./toolContext";
+import { asToolContext, UserIdOrToolContext } from "./toolContext";
+import { getErrorMessage } from '../../utils/errors';
 
 const now = FieldValue.serverTimestamp;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Tool Arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CreateTribeArgs {
+  name: string;
+  description?: string;
+  tags?: string[];
+}
+
+interface TribeIdArgs {
+  tribeId: string;
+}
+
+interface PostToTribeArgs {
+  tribeId: string;
+  content: string;
+  mediaUrl?: string;
+}
+
+interface ListTribeMessagesArgs {
+  tribeId: string;
+  limit?: number;
+}
+
+interface ListTrendingTribesArgs {
+  limit?: number;
+}
+
+interface WaveUserArgs {
+  targetUserId: string;
+}
+
+interface WaveIdArgs {
+  waveId: string;
+}
+
+interface ListNearbyUsersArgs {
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+}
+
+interface CheckInArgs {
+  placeId: string;
+  placeName: string;
+  location?: { lat: number; lng: number };
+}
+
+interface PlaceCheckInsArgs {
+  placeId: string;
+  limit?: number;
+}
+
+interface VibeMapArgs {
+  area: string;
+}
+
+// Unified result type with proper index signature
 interface ToolResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+// User data shape from check-ins
+interface CheckInUser {
+  userId: string;
+  placeId: string;
+  placeName: string;
+  location?: { lat: number; lng: number } | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Social Tools Implementation
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const socialTools = {
   // --- Tribes ---
 
-  createTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  createTribe: async (args: CreateTribeArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -31,12 +103,12 @@ export const socialTools = {
       };
       await db.collection("tribes").doc(id).set(payload);
       return { success: true, tribe: payload };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  joinTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  joinTribe: async (args: TribeIdArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -49,12 +121,12 @@ export const socialTools = {
         .doc(userId)
         .set({ joinedAt: now() });
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  leaveTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  leaveTribe: async (args: TribeIdArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -67,12 +139,12 @@ export const socialTools = {
         .doc(userId)
         .delete();
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  postToTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  postToTribe: async (args: PostToTribeArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -97,12 +169,12 @@ export const socialTools = {
         .doc(postId)
         .set(payload);
       return { success: true, post: payload };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  listTribeMessages: async (args: any): Promise<ToolResult> => {
+  listTribeMessages: async (args: ListTribeMessagesArgs): Promise<ToolResult> => {
     try {
       const snap = await db
         .collection("tribes")
@@ -112,21 +184,21 @@ export const socialTools = {
         .limit(args.limit || 20)
         .get();
       return { success: true, messages: snap.docs.map((d) => d.data()) };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  getTribeInfo: async (args: any): Promise<ToolResult> => {
+  getTribeInfo: async (args: TribeIdArgs): Promise<ToolResult> => {
     try {
       const snap = await db.collection("tribes").doc(args.tribeId).get();
       return { success: true, tribe: snap.exists ? snap.data() : null };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  listTrendingTribes: async (args: any): Promise<ToolResult> => {
+  listTrendingTribes: async (args: ListTrendingTribesArgs): Promise<ToolResult> => {
     try {
       // Approximate trending by recent posts count
       const snap = await db
@@ -138,14 +210,14 @@ export const socialTools = {
         success: true,
         tribes: snap.docs.slice(0, args.limit || 10).map((d) => d.data()),
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
   // --- Waves ---
 
-  waveUser: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  waveUser: async (args: WaveUserArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -161,12 +233,12 @@ export const socialTools = {
       };
       await db.collection("waves").doc(waveId).set(payload);
       return { success: true, waveId };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  acceptWave: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+  acceptWave: async (args: WaveIdArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
       return { success: false, error: "Unauthorized: User ID required" };
@@ -177,14 +249,14 @@ export const socialTools = {
         .doc(args.waveId)
         .set({ status: "accepted", respondedAt: now() }, { merge: true });
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
   // --- Check-ins & Discovery ---
 
-  listNearbyUsers: async (_args: any): Promise<ToolResult> => {
+  listNearbyUsers: async (_args: ListNearbyUsersArgs): Promise<ToolResult> => {
     try {
       // Approximate nearby users using recent check-ins (no geo radius yet)
       const snap = await db
@@ -193,7 +265,7 @@ export const socialTools = {
         .limit(50)
         .get();
       const seen = new Set<string>();
-      const users: any[] = [];
+      const users: CheckInUser[] = [];
       snap.forEach((doc) => {
         const data = doc.data();
         if (data.userId && !seen.has(data.userId)) {
@@ -207,14 +279,14 @@ export const socialTools = {
         }
       });
       return { success: true, users };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
   checkInToPlace: async (
-    args: any,
-    userIdOrContext: any,
+    args: CheckInArgs,
+    userIdOrContext: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const userId = asToolContext(userIdOrContext).userId;
     if (!userId)
@@ -232,12 +304,12 @@ export const socialTools = {
       };
       await db.collection("checkIns").doc(checkInId).set(payload);
       return { success: true, checkInId };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  getCheckInsForPlace: async (args: any): Promise<ToolResult> => {
+  getCheckInsForPlace: async (args: PlaceCheckInsArgs): Promise<ToolResult> => {
     try {
       const snap = await db
         .collection("checkIns")
@@ -246,12 +318,12 @@ export const socialTools = {
         .limit(args.limit || 20)
         .get();
       return { success: true, checkIns: snap.docs.map((d) => d.data()) };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
-  fetchVibeMapData: async (args: any): Promise<ToolResult> => {
+  fetchVibeMapData: async (args: VibeMapArgs): Promise<ToolResult> => {
     logger.debug("Fetching vibe map data for", args.area);
     return { success: true, area: args.area, hotspots: [] };
   },

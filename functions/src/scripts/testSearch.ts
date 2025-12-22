@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
 import "dotenv/config";
 import { client } from "../services/typesense.service";
+import { getErrorMessage } from '../utils/errors';
 
 async function testSearch() {
   logger.debug("🔍 Testing Typesense Search...");
@@ -13,8 +14,8 @@ async function testSearch() {
       logger.debug(
         `✅ Collection found. Documents: ${collection.num_documents}`,
       );
-    } catch (e: any) {
-      console.error(`❌ Collection check failed: ${e.message}`);
+    } catch (e: unknown) {
+      console.error(`❌ Collection check failed: ${getErrorMessage(e)}`);
       return;
     }
 
@@ -49,7 +50,7 @@ async function testSearch() {
         ` - ${h.document.title} (Venue: ${h.document.venue || "N/A"})`,
       );
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Test failed:", error);
   }
 }

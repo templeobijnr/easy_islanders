@@ -1,0 +1,52 @@
+# Gitleaks Configuration
+# SEC-04: Secret Scanning CI Guard
+#
+# This config defines patterns for secrets that MUST NOT be committed.
+# INVARIANT: Any commit containing these patterns MUST fail CI.
+#
+# @see Living Document Section 15.2, 17.3
+
+title = "AskMerve Gitleaks Configuration"
+
+[extend]
+# Extend the default gitleaks rules
+useDefault = true
+
+# Custom rules for our specific secrets
+[[rules]]
+id = "twilio-auth-token"
+description = "Twilio Auth Token"
+regex = '''(?i)twilio.*auth.*token.*['\"][a-f0-9]{32}['\"]'''
+keywords = ["twilio"]
+entropy = 3.5
+
+[[rules]]
+id = "gemini-api-key"
+description = "Gemini API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+keywords = ["gemini", "google", "api"]
+
+[[rules]]
+id = "firebase-admin-key"
+description = "Firebase Admin SDK Private Key"
+regex = '''-----BEGIN (RSA )?PRIVATE KEY-----'''
+keywords = ["firebase", "private"]
+
+[[rules]]
+id = "mapbox-token"
+description = "Mapbox Token"
+regex = '''(?i)(pk|sk)\.[a-zA-Z0-9]{60,}'''
+keywords = ["mapbox"]
+
+# Allowlist patterns that are safe
+[allowlist]
+description = "Global allowlist"
+paths = [
+  "**/*test*",
+  "**/*.test.ts",
+  "**/__tests__/**",
+  ".env.example",
+]
+
+# Commit-level allowlist for specific hashes
+commits = []

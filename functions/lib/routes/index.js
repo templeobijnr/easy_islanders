@@ -46,9 +46,13 @@ const message_repository_1 = require("../repositories/message.repository");
 const populate_controller_1 = require("../controllers/populate.controller");
 const user_controller_1 = require("../controllers/user.controller");
 const auth_1 = require("../middleware/auth");
+const requireBusinessMatch_1 = require("../middleware/requireBusinessMatch");
 const router = (0, express_1.Router)();
-// Chat
+// Chat (Platform Agent) - DO NOT MODIFY
 router.post('/chat/message', auth_1.isAuthenticated, chat_controller_1.handleChatMessage);
+// Business Chat (Business Agents) - NEW
+const business_chat_controller_1 = require("../controllers/business-chat.controller");
+router.post('/business-chat/message', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, business_chat_controller_1.handleBusinessChatMessage);
 // Search
 router.post('/search', search_controller_1.searchListings);
 // Payments
@@ -284,9 +288,36 @@ router.post('/whatsapp/webhook', async (req, res) => {
 });
 // Database Population (Admin only)
 router.post('/admin/populate', populate_controller_1.populateDatabase);
+// Admin Role Management
+const admin_controller_1 = require("../controllers/admin.controller");
+router.post('/admin/sync-claims', auth_1.isAuthenticated, admin_controller_1.syncAdminClaims);
+router.post('/admin/promote', auth_1.isAuthenticated, admin_controller_1.promoteToAdmin);
+router.post('/admin/demote', auth_1.isAuthenticated, admin_controller_1.demoteAdmin);
 // Social / Connect
 router.get('/users/nearby', auth_1.isAuthenticated, user_controller_1.getNearbyUsers);
 router.post('/users/wave', auth_1.isAuthenticated, user_controller_1.waveAtUser);
+// Places / Venues
+const places_controller_1 = require("../controllers/places.controller");
+router.get('/places', places_controller_1.getPlaces);
+router.get('/places/nearby', places_controller_1.getNearbyPlaces);
+router.get('/places/:id', places_controller_1.getPlaceById);
+// Knowledge Base / RAG Pipeline
+const knowledge_controller_1 = require("../controllers/knowledge.controller");
+router.get('/knowledge/:businessId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.listKnowledge);
+router.post('/knowledge/ingest', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.ingestKnowledge);
+router.post('/knowledge/ingest-image', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.ingestImage);
+router.post('/knowledge/extract-url', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.extractFromUrl);
+router.post('/knowledge/retrieve', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.retrieveKnowledge);
+router.post('/knowledge/extract-products', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.extractProducts);
+router.put('/knowledge/chunk/:chunkId/status', auth_1.isAuthenticated, knowledge_controller_1.updateChunkStatus);
+router.delete('/knowledge/:businessId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, knowledge_controller_1.clearKnowledge);
+// Products / Catalog
+const products_controller_1 = require("../controllers/products.controller");
+router.get('/products/:businessId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, products_controller_1.listProducts);
+router.get('/products/:businessId/:productId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, products_controller_1.getProduct);
+router.post('/products/:businessId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, products_controller_1.createProduct);
+router.put('/products/:businessId/:productId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, products_controller_1.updateProduct);
+router.delete('/products/:businessId/:productId', auth_1.isAuthenticated, requireBusinessMatch_1.requireBusinessMatch, products_controller_1.deleteProduct);
 // Health Check
 router.get('/health', (req, res) => {
     res.json({ status: 'online', timestamp: new Date().toISOString() });

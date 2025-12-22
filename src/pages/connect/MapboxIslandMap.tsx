@@ -12,19 +12,17 @@ import {
   Utensils,
   Coffee,
   Camera,
-  Hand,
 } from "lucide-react";
 import { SocialUser } from "../../types";
 import PassportCard from "./PassportCard";
 import { FeedItem, Stay, PinType, CheckIn } from "../../types/connect";
 import MapBottomSheet from "./MapBottomSheet";
 import StayBookingModule from "./StayBookingModule";
-import { BookingsService } from "../../services/bookingsService";
+import { BookingsService } from "../../services/domains/bookings/bookings.service";
 import { formatDate } from "../../utils/formatters";
 import {
   checkIn,
   joinEvent,
-  wave,
   subscribeToAllActiveCheckIns,
 } from "../../services/connectService";
 
@@ -181,19 +179,6 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
     }
   };
 
-  const handleWaveAtUser = async (targetUserId: string) => {
-    try {
-      await fetch(v1ApiUrl("/users/wave"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId }),
-      });
-      alert(`Waved at user! 👋`);
-    } catch (err) {
-      console.error("Failed to wave:", err);
-    }
-  };
-
   // Update Place Markers
   useEffect(() => {
     if (!map.current) return;
@@ -262,26 +247,24 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
                 <div class="relative flex flex-col items-center">
                     <div class="relative flex items-center justify-center w-8 h-8 ${color} rounded-full border-2 border-white shadow-lg cursor-pointer transform transition-transform hover:scale-110">
                         <span class="text-xs">${icon}</span>
-                        ${
-                          checkInCount > 0
-                            ? `
+                        ${checkInCount > 0
+          ? `
                             <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border border-white rounded-full flex items-center justify-center">
                                 <span class="text-[8px] font-bold text-white">${checkInCount > 9 ? "9+" : checkInCount}</span>
                             </div>
                         `
-                            : ""
-                        }
+          : ""
+        }
                     </div>
-                    ${
-                      checkInCount > 0
-                        ? `
+                    ${checkInCount > 0
+          ? `
                         <div class="flex mt-1" style="margin-left: 6px;">
                             ${avatarBubbles}
                             ${checkInCount > 3 ? `<div class="w-5 h-5 rounded-full bg-slate-600 border-2 border-white flex items-center justify-center" style="margin-left: -6px"><span class="text-[8px] text-white font-bold">+${checkInCount - 3}</span></div>` : ""}
                         </div>
                     `
-                        : ""
-                    }
+          : ""
+        }
                 </div>
             `;
       el.addEventListener("click", () => {
@@ -391,22 +374,6 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
     }
   };
 
-  const handleWave = async (id: string) => {
-    if (!currentUser) {
-      alert("Please sign in to wave");
-      return;
-    }
-    const place = places.find((p) => p.id === id);
-    if (!place) return;
-
-    try {
-      await wave(currentUser.id, id, currentUser.name);
-      alert(`👋 You waved at everyone at ${place.title}!`);
-    } catch (err) {
-      console.error("Wave failed:", err);
-    }
-  };
-
   const handleBook = (id: string) => {
     const stay = places.find((p) => p.id === id && p.type === "stay") as
       | Stay
@@ -512,12 +479,6 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
               ✕
             </button>
             <PassportCard user={selectedUser} />
-            <button
-              onClick={() => handleWaveAtUser(selectedUser.id)}
-              className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
-            >
-              <Hand size={18} /> Wave at {selectedUser.name.split(" ")[0]}
-            </button>
           </div>
         </div>
       )}
@@ -532,7 +493,6 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
           onJoin={handleJoin}
           onBook={handleBook}
           onTaxi={handleTaxi}
-          onWave={handleWave}
           onNavigate={handleNavigate}
         />
       )}

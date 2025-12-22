@@ -1,7 +1,24 @@
 /**
- * Discover Config Service
- * Handles CRUD operations for Discover and Homepage configurations
- * Includes caching with 5-minute TTL for performance
+ * Application Service: Discover Config
+ *
+ * Responsibility:
+ * - CRUD operations for Discover and Homepage configurations
+ * - Region, tab, and category visibility management
+ * - Caching with 5-minute TTL
+ *
+ * Firestore Collections:
+ * - appConfig (docs: discover, homepage)
+ *
+ * Layer: Application Service
+ *
+ * Dependencies:
+ * - firebaseConfig (infrastructure)
+ *
+ * Notes:
+ * - Includes in-memory caching for performance
+ * - Safe to modify in isolation
+ *
+ * Stability: Core
  */
 
 import { logger } from "@/utils/logger";
@@ -91,13 +108,13 @@ export const getDiscoverConfig = async (
               ? Array.isArray(value.subRegions)
                 ? value.subRegions
                 : Object.entries(value.subRegions).map(
-                    ([subId, subVal]: [string, any]) => ({
-                      id: subId,
-                      label: subVal.label || subId,
-                      isVisible: subVal.visible ?? subVal.isVisible ?? true,
-                      aliases: subVal.aliases || [],
-                    }),
-                  )
+                  ([subId, subVal]: [string, any]) => ({
+                    id: subId,
+                    label: subVal.label || subId,
+                    isVisible: subVal.visible ?? subVal.isVisible ?? true,
+                    aliases: subVal.aliases || [],
+                  }),
+                )
               : [],
           }),
         );
@@ -119,13 +136,13 @@ export const getDiscoverConfig = async (
             ? Array.isArray(value.categories)
               ? value.categories
               : Object.entries(value.categories).map(
-                  ([catId, catVal]: [string, any]) => ({
-                    id: catId,
-                    label: catVal.label || catId,
-                    icon: catVal.icon || catVal.emoji || "",
-                    isVisible: catVal.visible ?? catVal.isVisible ?? true,
-                  }),
-                )
+                ([catId, catVal]: [string, any]) => ({
+                  id: catId,
+                  label: catVal.label || catId,
+                  icon: catVal.icon || catVal.emoji || "",
+                  isVisible: catVal.visible ?? catVal.isVisible ?? true,
+                }),
+              )
             : [],
         }));
       } else {

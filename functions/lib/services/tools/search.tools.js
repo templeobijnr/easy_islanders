@@ -151,6 +151,53 @@ exports.searchTools = {
             console.error("🔴 [Search Events] Failed:", error);
             return [];
         }
+    },
+    /**
+     * Search specifically for housing
+     */
+    searchHousingListings: async (args, ctx) => {
+        console.log("🏠 [Search] Housing:", args);
+        const { searchListings } = await Promise.resolve().then(() => __importStar(require('../typesense.service')));
+        // Map args to searchListings params
+        return searchListings({
+            query: '*', // Default to all if no specific query
+            domain: 'Real Estate', // or 'housing' depending on your index
+            category: 'housing',
+            location: args.areaName, // Map areaName to location
+            minPrice: args.budgetMin,
+            maxPrice: args.budgetMax,
+            bedrooms: args.bedrooms,
+            perPage: 10
+        });
+    },
+    /**
+     * Search curated places
+     */
+    searchPlaces: async (args, ctx) => {
+        console.log("📍 [Search] Curated Places:", args);
+        // Try Typesense first for curated places
+        try {
+            const { searchListings } = await Promise.resolve().then(() => __importStar(require('../typesense.service')));
+            const result = await searchListings({
+                query: args.tag || '*',
+                domain: 'Places',
+                category: args.category,
+                perPage: args.limit || 10
+            });
+            if (result.found > 0) {
+                return result.hits;
+            }
+        }
+        catch (e) {
+            console.warn("TypeSense place search failed, falling back to Mapbox", e);
+        }
+        // Fallback to Mapbox if no curated places found
+        const { searchMapboxPlaces } = await Promise.resolve().then(() => __importStar(require('../mapbox.service')));
+        const query = `${args.category || ''} ${args.tag || ''}`;
+        return searchMapboxPlaces(query, {
+            types: 'poi',
+            limit: args.limit || 10
+        });
     }
 };
 //# sourceMappingURL=search.tools.js.map

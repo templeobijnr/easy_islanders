@@ -146,7 +146,7 @@ export const handleIncomingWhatsApp = async (req: Request, res: Response) => {
       messageSid,
     });
     res.status(200).send("OK");
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ [Twilio Webhook] Error:", error);
     // Return 200 to prevent Twilio retries on parsing errors
     res.status(200).send("OK");
@@ -187,7 +187,7 @@ export const handleMessageStatus = async (req: Request, res: Response) => {
       `✅ [Twilio Status] Logged status: ${status} for ${messageSid}`,
     );
     res.status(200).send("OK");
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ [Twilio Status] Error:", error);
     res.status(500).send("Error");
   }

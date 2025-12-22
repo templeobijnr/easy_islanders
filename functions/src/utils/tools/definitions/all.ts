@@ -1,7 +1,6 @@
 import { searchMarketplaceTool } from "./marketplace.tools";
 import {
   initiateBookingTool,
-  createPaymentIntentTool,
   scheduleViewingTool,
 } from "./booking.tools";
 import { consultEncyclopediaTool, getRealTimeInfoTool } from "./info.tools";
@@ -20,17 +19,11 @@ import {
   listFavoritesTool,
 } from "./user.tools";
 import {
-  createTribeTool,
-  joinTribeTool,
-  leaveTribeTool,
-  postToTribeTool,
-  listTribeMessagesTool,
-  getTribeInfoTool,
-  listTrendingTribesTool,
-} from "./tribes.tools";
+  listUserAddressesTool,
+  createOrUpdateAddressTool,
+  setDefaultAddressTool,
+} from "./addressBook.tools";
 import {
-  waveUserTool,
-  acceptWaveTool,
   listNearbyUsersTool,
   checkInToPlaceTool,
   getCheckInsForPlaceTool,
@@ -84,7 +77,6 @@ export const ALL_TOOL_DEFINITIONS = [
   requestTaxiTool,
   dispatchTaxiTool,
   createConsumerRequestTool,
-  createPaymentIntentTool,
   scheduleViewingTool,
   searchLocalPlacesTool,
   searchEventsTool,
@@ -92,15 +84,9 @@ export const ALL_TOOL_DEFINITIONS = [
   updateUserProfileTool,
   saveFavoriteItemTool,
   listFavoritesTool,
-  createTribeTool,
-  joinTribeTool,
-  leaveTribeTool,
-  postToTribeTool,
-  listTribeMessagesTool,
-  getTribeInfoTool,
-  listTrendingTribesTool,
-  waveUserTool,
-  acceptWaveTool,
+  listUserAddressesTool,
+  createOrUpdateAddressTool,
+  setDefaultAddressTool,
   listNearbyUsersTool,
   checkInToPlaceTool,
   getCheckInsForPlaceTool,

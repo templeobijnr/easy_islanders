@@ -1,16 +1,59 @@
 import { db } from '../../config/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
+import { asToolContext, UserIdOrToolContext } from './toolContext';
+import { getErrorMessage } from '../../utils/errors';
 
 const now = FieldValue.serverTimestamp;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface UpdateBusinessInfoArgs {
+    businessId: string;
+    name?: string;
+    description?: string;
+    phone?: string;
+}
+
+interface UpdateBusinessAvailabilityArgs {
+    businessId: string;
+    availability: Record<string, boolean | string>;
+}
+
+interface UpdateBusinessHoursArgs {
+    businessId: string;
+    hours: Record<string, { open: string; close: string }>;
+}
+
+interface UploadBusinessMediaArgs {
+    businessId: string;
+    mediaUrl: string;
+}
+
+interface BusinessIdArgs {
+    businessId: string;
+}
+
+interface RespondToLeadArgs {
+    businessId: string;
+    leadId: string;
+    message: string;
+}
 
 interface ToolResult {
     success: boolean;
     error?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Business Tools Implementation
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const businessTools = {
-    updateBusinessInfo: async (args: any, userId: string): Promise<ToolResult> => {
+    updateBusinessInfo: async (args: UpdateBusinessInfoArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
@@ -21,12 +64,13 @@ export const businessTools = {
                 updatedAt: now()
             }, { merge: true });
             return { success: true };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     },
 
-    updateBusinessAvailability: async (args: any, userId: string): Promise<ToolResult> => {
+    updateBusinessAvailability: async (args: UpdateBusinessAvailabilityArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
@@ -35,12 +79,13 @@ export const businessTools = {
                 updatedAt: now()
             }, { merge: true });
             return { success: true };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     },
 
-    updateBusinessHours: async (args: any, userId: string): Promise<ToolResult> => {
+    updateBusinessHours: async (args: UpdateBusinessHoursArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
@@ -49,12 +94,13 @@ export const businessTools = {
                 updatedAt: now()
             }, { merge: true });
             return { success: true };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     },
 
-    uploadBusinessMedia: async (args: any, userId: string): Promise<ToolResult> => {
+    uploadBusinessMedia: async (args: UploadBusinessMediaArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
@@ -64,23 +110,25 @@ export const businessTools = {
                 uploadedAt: now()
             });
             return { success: true };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     },
 
-    listBusinessLeads: async (args: any, userId: string): Promise<ToolResult> => {
+    listBusinessLeads: async (args: BusinessIdArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
             const snap = await db.collection('businesses').doc(args.businessId).collection('leads').orderBy('createdAt', 'desc').limit(20).get();
             return { success: true, leads: snap.docs.map(d => d.data()) };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     },
 
-    respondToLead: async (args: any, userId: string): Promise<ToolResult> => {
+    respondToLead: async (args: RespondToLeadArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const userId = asToolContext(userIdOrContext).userId;
         if (!userId) return { success: false, error: "Unauthorized: User ID required" };
 
         try {
@@ -89,8 +137,8 @@ export const businessTools = {
                 respondedAt: now()
             }, { merge: true });
             return { success: true };
-        } catch (err: any) {
-            return { success: false, error: err.message };
+        } catch (err: unknown) {
+            return { success: false, error: getErrorMessage(err) };
         }
     }
 };

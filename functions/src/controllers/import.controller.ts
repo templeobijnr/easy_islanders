@@ -2,6 +2,7 @@ import * as logger from "firebase-functions/logger";
 import { Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cheerio from "cheerio";
+import { getErrorMessage } from '../utils/errors';
 
 const fetchFn = (globalThis as any).fetch as typeof fetch;
 
@@ -221,8 +222,8 @@ const scrapeListing = async (url: string) => {
       images: images.filter(Boolean),
       location: possibleLocation || undefined,
     };
-  } catch (error: any) {
-    console.error("❌ [Scrape] Error:", error.message);
+  } catch (error: unknown) {
+    console.error("❌ [Scrape] Error:", getErrorMessage(error));
     return null;
   }
 };
@@ -397,8 +398,8 @@ export const importPropertyFromUrl = async (req: Request, res: Response) => {
         } else {
           console.warn("⚠️ [AI] Could not extract JSON from response");
         }
-      } catch (error: any) {
-        console.error("🔴 [AI] Error:", error.message);
+      } catch (error: unknown) {
+        console.error("🔴 [AI] Error:", getErrorMessage(error));
         // Continue with scraped data only
       }
     }
@@ -463,11 +464,11 @@ export const importPropertyFromUrl = async (req: Request, res: Response) => {
     });
 
     res.json(merged);
-  } catch (error: any) {
-    console.error("🔴 [Import] Error:", error.message);
+  } catch (error: unknown) {
+    console.error("🔴 [Import] Error:", getErrorMessage(error));
     res.status(500).json({
       error: "Failed to import property",
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 };

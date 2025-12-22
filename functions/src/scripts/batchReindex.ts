@@ -2,6 +2,7 @@ import * as logger from "firebase-functions/logger";
 import "dotenv/config";
 import { db } from "../config/firebase";
 import * as typesenseService from "../services/typesense.service";
+import { getErrorMessage } from '../utils/errors';
 
 /**
  * Batch reindex all Firestore listings to Typesense
@@ -56,9 +57,9 @@ export async function batchReindexListings() {
           if (processed % 10 === 0) {
             process.stdout.write(`\r   Indexed: ${processed}/${total}`);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           errors++;
-          console.error(`\n   ❌ Error indexing ${doc.id}:`, error.message);
+          console.error(`\n   ❌ Error indexing ${doc.id}:`, getErrorMessage(error));
         }
       }
 
@@ -77,7 +78,7 @@ export async function batchReindexListings() {
     logger.debug(`   ❌ Errors: ${errors}`);
 
     return { success: true, indexed: processed, errors };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Reindex failed:", error);
     throw error;
   }

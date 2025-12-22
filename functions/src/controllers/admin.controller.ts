@@ -2,6 +2,7 @@ import * as logger from "firebase-functions/logger";
 import { Request, Response } from "express";
 import * as admin from "firebase-admin";
 import { db } from "../config/firebase";
+import { getErrorMessage } from '../utils/errors';
 
 /**
  * Bootstrap emails - same as in auth.triggers.ts
@@ -115,9 +116,9 @@ export const syncAdminClaims = async (req: Request, res: Response) => {
       role: role,
       claims: customClaims,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Admin Controller] Error syncing claims:", error);
-    res.status(500).json({ error: error.message || "Failed to sync claims" });
+    res.status(500).json({ error: getErrorMessage(error) || "Failed to sync claims" });
   }
 };
 
@@ -199,9 +200,9 @@ export const promoteToAdmin = async (req: Request, res: Response) => {
       message: `User ${uid} promoted to admin`,
       promotedBy: decodedToken.email,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Admin Controller] Error promoting user:", error);
-    res.status(500).json({ error: error.message || "Failed to promote user" });
+    res.status(500).json({ error: getErrorMessage(error) || "Failed to promote user" });
   }
 };
 
@@ -266,9 +267,9 @@ export const demoteAdmin = async (req: Request, res: Response) => {
       status: "success",
       message: `User ${targetUid} demoted to regular user`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Admin Controller] Error demoting user:", error);
-    res.status(500).json({ error: error.message || "Failed to demote user" });
+    res.status(500).json({ error: getErrorMessage(error) || "Failed to demote user" });
   }
 };
 

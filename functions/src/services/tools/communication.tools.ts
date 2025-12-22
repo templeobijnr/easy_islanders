@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errors';
 /**
  * Communication Tools
  *
@@ -14,7 +15,7 @@ const now = FieldValue.serverTimestamp;
 interface ToolResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const communicationTools = {
@@ -43,11 +44,11 @@ export const communicationTools = {
         status: res.status,
         sid: res.sid,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [WhatsApp] Failed:", err);
       return {
         success: false,
-        error: err.message || "send failed",
+        error: getErrorMessage(err) || "send failed",
       };
     }
   },
@@ -78,11 +79,11 @@ export const communicationTools = {
         success: true,
         message: "Notification sent",
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [Notification] Failed:", err);
       return {
         success: false,
-        error: err.message || "Failed to send notification",
+        error: getErrorMessage(err) || "Failed to send notification",
       };
     }
   },

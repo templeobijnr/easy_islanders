@@ -3,7 +3,7 @@ import {
   LISTING_CATEGORIES,
   PLACES_PROXY_URL,
 } from "../unifiedListingForm.constants";
-import { GoogleImportService } from "../../../../services/googleImportService";
+import { GoogleImportService } from "../../../../services/integrations/google/google-import.client";
 import type { ListingFormSetState } from "./useListingForm";
 
 type LocationSuggestion = { id: string; primary: string; secondary: string };

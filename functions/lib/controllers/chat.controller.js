@@ -36,13 +36,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.reindexListings = exports.handleChatMessage = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 const agentTools_1 = require("../utils/agentTools");
-const toolService_1 = require("../services/toolService");
+const tool_service_1 = require("../services/agent/tool.service");
 const chat_repository_1 = require("../repositories/chat.repository");
 const memory_service_1 = require("../services/memory.service");
 const firebase_1 = require("../config/firebase");
 const user_service_1 = require("../services/user.service");
-// Initialize Gemini with API Key from environment variables
-const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const transaction_repository_1 = require("../repositories/transaction.repository");
+const booking_ledger_tools_1 = require("../services/tools/booking-ledger.tools");
+// Initialize Gemini lazily
+let genAI = null;
+const getGenAI = () => {
+    if (!genAI) {
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        if (!GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is not configured');
+        }
+        genAI = new generative_ai_1.GoogleGenerativeAI(GEMINI_API_KEY);
+    }
+    return genAI;
+};
 const systemPrompts_1 = require("../utils/systemPrompts");
 const handleChatMessage = async (req, res) => {
     var _a, _b, _c;
@@ -92,6 +104,105 @@ const handleChatMessage = async (req, res) => {
         // Effective location = current turn location, or last known one from profile
         const lastLocation = userData.lastLocation;
         const effectiveLocation = userLocation || lastLocation || null;
+        // ════════════════════════════════════════════════════════════════════════
+        // CONFIRMATION GATE - Check for pending action BEFORE LLM processing
+        // ════════════════════════════════════════════════════════════════════════
+        const pendingAction = await chat_repository_1.chatRepository.getPendingAction(sessionId, user.uid);
+        if (pendingAction) {
+            const normalizedMessage = cleanMessage.toLowerCase().trim();
+            const isYes = ['yes', 'y', 'confirm', 'ok', 'okay', 'yep', 'sure', 'evet'].includes(normalizedMessage);
+            const isNo = ['no', 'n', 'cancel', 'stop', 'nevermind', 'hayır', 'iptal'].includes(normalizedMessage);
+            // Fast expiry check with 30s buffer (UX optimization - ledger is still authority)
+            // Don't attempt confirm if < 30s remaining to avoid race conditions
+            const EXPIRY_BUFFER_MS = 30 * 1000;
+            const timeRemaining = pendingAction.holdExpiresAt.getTime() - Date.now();
+            const isExpiredLocally = timeRemaining < EXPIRY_BUFFER_MS;
+            if (isYes) {
+                // Only handle confirm_transaction here - other kinds handled by orchestrator
+                if (pendingAction.kind !== 'confirm_transaction' || !pendingAction.txId || !pendingAction.businessId) {
+                    // Let orchestrator handle other kinds (confirm_order, confirm_service)
+                    // Fall through to normal processing - orchestrator will handle
+                }
+                else {
+                    // Use deterministic idempotency key: confirm:{txId}:{userId}
+                    const idempotencyKey = `confirm:${pendingAction.txId}:${user.uid}`;
+                    const confirmResult = await transaction_repository_1.transactionRepository.confirmTransaction({
+                        transactionId: pendingAction.txId,
+                        businessId: pendingAction.businessId,
+                        actorType: 'user',
+                        actorId: user.uid,
+                    }, idempotencyKey);
+                    await chat_repository_1.chatRepository.clearPendingAction(sessionId);
+                    if (!confirmResult.success) {
+                        if (confirmResult.errorCode === 'HOLD_EXPIRED') {
+                            await chat_repository_1.chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId });
+                            await chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: 'That reservation expired. Would you like me to try booking again?' }], { userId: user.uid, agentId });
+                            res.json({
+                                text: "⏰ That reservation expired. Would you like me to try booking again?",
+                                sessionId,
+                                expired: true
+                            });
+                            return;
+                        }
+                        res.json({
+                            text: `Unable to confirm: ${confirmResult.error}`,
+                            sessionId,
+                            error: true
+                        });
+                        return;
+                    }
+                    await chat_repository_1.chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId });
+                    const confirmText = `✅ Confirmed! Your confirmation code is **${confirmResult.confirmationCode}**. You'll receive a message shortly.`;
+                    await chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: confirmText }], { userId: user.uid, agentId });
+                    res.json({
+                        text: confirmText,
+                        sessionId,
+                        booking: { transactionId: pendingAction.txId, confirmationCode: confirmResult.confirmationCode }
+                    });
+                    return;
+                }
+            }
+            if (isNo) {
+                // Only handle confirm_transaction here
+                if (pendingAction.kind === 'confirm_transaction' && pendingAction.txId && pendingAction.businessId) {
+                    // Use deterministic idempotency key: release:{txId}:{userId}
+                    const idempotencyKey = `release:${pendingAction.txId}:${user.uid}`;
+                    await transaction_repository_1.transactionRepository.releaseHold(pendingAction.businessId, pendingAction.txId, 'User cancelled', idempotencyKey);
+                    await chat_repository_1.chatRepository.clearPendingAction(sessionId);
+                    await chat_repository_1.chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId });
+                    const cancelText = "Okay, I've cancelled that reservation. Is there anything else I can help you with?";
+                    await chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: cancelText }], { userId: user.uid, agentId });
+                    res.json({
+                        text: cancelText,
+                        sessionId,
+                        cancelled: true
+                    });
+                    return;
+                }
+                // Non-transaction kinds: clear and let orchestrator handle
+                await chat_repository_1.chatRepository.clearPendingAction(sessionId);
+            }
+            // User sent something else - remind them
+            // But if expired, clear and let them continue
+            if (isExpiredLocally) {
+                await chat_repository_1.chatRepository.clearPendingAction(sessionId);
+                // Fall through to normal LLM processing
+            }
+            else {
+                await chat_repository_1.chatRepository.saveMessage(sessionId, 'user', [{ text: cleanMessage }], { userId: user.uid, agentId });
+                const reminderText = `I'm still waiting for your confirmation:\n\n> ${pendingAction.summary}\n\nPlease reply **YES** to confirm or **NO** to cancel.`;
+                await chat_repository_1.chatRepository.saveMessage(sessionId, 'model', [{ text: reminderText }], { userId: user.uid, agentId });
+                res.json({
+                    text: reminderText,
+                    sessionId,
+                    awaitingConfirmation: true
+                });
+                return;
+            }
+        }
+        // ════════════════════════════════════════════════════════════════════════
+        // END CONFIRMATION GATE
+        // ════════════════════════════════════════════════════════════════════════
         // 2. Construct Contextual System Prompt
         const now = new Date();
         const timeString = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -153,7 +264,7 @@ const handleChatMessage = async (req, res) => {
         const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
         console.log(`🤖 Using model: ${modelName}`);
         console.log(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
-        const model = genAI.getGenerativeModel({
+        const model = getGenAI().getGenerativeModel({
             model: modelName,
             systemInstruction: contextPrompt,
             tools: [{ functionDeclarations: agentTools_1.ALL_TOOL_DEFINITIONS }],
@@ -205,7 +316,7 @@ const handleChatMessage = async (req, res) => {
                 let toolResult = {};
                 try {
                     if (fnName === 'searchMarketplace' || fnName === 'searchLocalPlaces' || fnName === 'searchEvents') {
-                        const resolver = toolService_1.toolResolvers[fnName];
+                        const resolver = tool_service_1.toolResolvers[fnName];
                         const items = await resolver(Object.assign({}, fnArgs
                         // Intentionally do NOT scope by ownerUid; agent should see all listings
                         ));
@@ -220,28 +331,71 @@ const handleChatMessage = async (req, res) => {
                         toolResult = { results: simplifiedItems, count: simplifiedItems.length };
                     }
                     else if (fnName === 'initiateBooking') {
-                        const res = await toolService_1.toolResolvers.createBooking(fnArgs, user.uid);
-                        booking = res; // Store full booking for frontend
-                        toolResult = { success: true, bookingId: res.id, receipt: res.receipt };
+                        // Use transaction ledger: draft -> hold -> await confirmation
+                        const itemId = fnArgs.itemId;
+                        // Fail closed: require explicit businessId resolution
+                        const businessResult = await (0, booking_ledger_tools_1.resolveBusinessId)(itemId);
+                        if (!businessResult.success) {
+                            toolResult = {
+                                success: false,
+                                error: businessResult.error,
+                                errorCode: businessResult.errorCode
+                            };
+                        }
+                        else {
+                            const holdResult = await (0, booking_ledger_tools_1.createHeldBooking)({
+                                businessId: businessResult.businessId,
+                                offeringId: itemId,
+                                offeringName: fnArgs.itemTitle || 'Booking',
+                                channel: 'app_chat',
+                                actor: { userId: user.uid, name: userName },
+                                date: fnArgs.date || fnArgs.checkInDate || new Date().toISOString().split('T')[0],
+                                time: fnArgs.time || '12:00',
+                                partySize: fnArgs.guests || 1,
+                                notes: fnArgs.specialRequests,
+                                idempotencyKey: `booking:${sessionId}:${itemId}:${fnArgs.date || 'now'}`,
+                            });
+                            if (!holdResult.success) {
+                                toolResult = {
+                                    success: false,
+                                    error: holdResult.error,
+                                    unavailable: holdResult.errorCode === 'RESOURCE_UNAVAILABLE'
+                                };
+                            }
+                            else {
+                                // Store pending action for confirmation gate
+                                await chat_repository_1.chatRepository.setPendingAction(sessionId, holdResult.pendingAction);
+                                booking = {
+                                    transactionId: holdResult.txId,
+                                    awaitingConfirmation: true,
+                                    holdExpiresAt: holdResult.holdExpiresAt
+                                };
+                                toolResult = {
+                                    success: true,
+                                    awaitingConfirmation: true,
+                                    confirmationPrompt: holdResult.confirmationPrompt
+                                };
+                            }
+                        }
                     }
                     else if (fnName === 'createPaymentIntent') {
-                        const res = await toolService_1.toolResolvers.createPaymentIntent(fnArgs, user.uid);
+                        const res = await tool_service_1.toolResolvers.createPaymentIntent(fnArgs, user.uid);
                         payment = res.payment;
                         toolResult = res;
                     }
                     else if (fnName === 'scheduleViewing') {
-                        const res = await toolService_1.toolResolvers.scheduleViewing(fnArgs, user.uid);
+                        const res = await tool_service_1.toolResolvers.scheduleViewing(fnArgs, user.uid);
                         viewingRequest = res;
                         toolResult = res;
                     }
                     else if (fnName === 'consultEncyclopedia') {
-                        toolResult = await toolService_1.toolResolvers.consultEncyclopedia(fnArgs);
+                        toolResult = await tool_service_1.toolResolvers.consultEncyclopedia(fnArgs);
                     }
                     else if (fnName === 'getRealTimeInfo') {
-                        toolResult = await toolService_1.toolResolvers.getRealTimeInfo(fnArgs);
+                        toolResult = await tool_service_1.toolResolvers.getRealTimeInfo(fnArgs);
                     }
                     else if (fnName === 'sendWhatsAppMessage') {
-                        toolResult = await toolService_1.toolResolvers.sendWhatsAppMessage(fnArgs);
+                        toolResult = await tool_service_1.toolResolvers.sendWhatsAppMessage(fnArgs);
                     }
                     else if (fnName === 'dispatchTaxi' || fnName === 'requestTaxi') {
                         // Auto-inject user location (current or last known) if available
@@ -256,7 +410,7 @@ const handleChatMessage = async (req, res) => {
                         if (!enrichedArgs.pickupLocation || /^current location$/i.test(enrichedArgs.pickupLocation)) {
                             enrichedArgs.pickupLocation = 'Current location (see map link)';
                         }
-                        const resolver = fnName === 'dispatchTaxi' ? toolService_1.toolResolvers.dispatchTaxi : toolService_1.toolResolvers.requestTaxi;
+                        const resolver = fnName === 'dispatchTaxi' ? tool_service_1.toolResolvers.dispatchTaxi : tool_service_1.toolResolvers.requestTaxi;
                         toolResult = await resolver(enrichedArgs, user.uid, sessionId);
                         // Capture requestId for frontend tracking
                         if (toolResult.success && toolResult.requestId) {
@@ -265,21 +419,21 @@ const handleChatMessage = async (req, res) => {
                         }
                     }
                     else if (fnName === 'orderHouseholdSupplies') {
-                        toolResult = await toolService_1.toolResolvers.orderHouseholdSupplies(fnArgs, user.uid);
+                        toolResult = await tool_service_1.toolResolvers.orderHouseholdSupplies(fnArgs, user.uid);
                     }
                     else if (fnName === 'requestService') {
-                        toolResult = await toolService_1.toolResolvers.requestService(fnArgs, user.uid);
+                        toolResult = await tool_service_1.toolResolvers.requestService(fnArgs, user.uid);
                     }
                     else if (fnName === 'createConsumerRequest') {
-                        toolResult = await toolService_1.toolResolvers.createConsumerRequest(fnArgs);
+                        toolResult = await tool_service_1.toolResolvers.createConsumerRequest(fnArgs);
                     }
                     else if (fnName === 'showMap') {
-                        toolResult = await toolService_1.toolResolvers.showMap(fnArgs);
+                        toolResult = await tool_service_1.toolResolvers.showMap(fnArgs);
                         // Store map location for frontend response
                         mapLocation = toolResult;
                     }
                     else {
-                        const resolver = toolService_1.toolResolvers[fnName];
+                        const resolver = tool_service_1.toolResolvers[fnName];
                         if (!resolver) {
                             throw new Error(`Tool not implemented: ${fnName}`);
                         }

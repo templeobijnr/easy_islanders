@@ -13,8 +13,11 @@ import { v1App } from "./api/app";
 
 import { requireAdmin } from "./middleware/requireAdmin";
 import { apiLimiter } from "./middleware/rateLimiter";
+import type { NextFunction, Request, Response } from "express";
 
-const runMiddleware = (req: any, res: any, fn: any) =>
+type Middleware = (req: Request, res: Response, next: NextFunction) => unknown;
+
+const runMiddleware = (req: Request, res: Response, fn: Middleware) =>
   new Promise<void>((resolve, reject) => {
     let settled = false;
     const next = (result?: unknown) => {
@@ -93,6 +96,12 @@ export * from "./triggers/transaction-events.triggers";
 // 3b. Scheduled Workers
 export * from "./scheduled/expiry.scheduled";
 export * from "./scheduled/invariants.scheduled";
+export * from "./scheduled/jobTimeout.scheduled";
+
+// 3c. Task Workers (Cloud Tasks)
+// NOTE: Twilio webhook enqueues "processWhatsAppInbound" by name.
+// This export ensures the task worker is deployed and can drain the queue.
+export { processWhatsAppInbound } from "./tasks/whatsappInbound.task";
 
 // 4. Manual Reindex Endpoint
 import { reindexListings } from "./controllers/chat.controller";
@@ -104,11 +113,11 @@ export const reindex = onRequest(
   },
   async (req, res) => {
     req.app?.set("trust proxy", true);
-    await runMiddleware(req, res, apiLimiter);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, apiLimiter);
     if (res.headersSent) return;
-    await runMiddleware(req, res, requireAdmin);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, requireAdmin);
     if (res.headersSent) return;
-    return reindexListings(req as any, res as any);
+    return reindexListings(req as unknown as Request, res as unknown as Response);
   },
 );
 
@@ -122,11 +131,11 @@ export const populate = onRequest(
   },
   async (req, res) => {
     req.app?.set("trust proxy", true);
-    await runMiddleware(req, res, apiLimiter);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, apiLimiter);
     if (res.headersSent) return;
-    await runMiddleware(req, res, requireAdmin);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, requireAdmin);
     if (res.headersSent) return;
-    return populateDatabase(req as any, res as any);
+    return populateDatabase(req as unknown as Request, res as unknown as Response);
   },
 );
 
@@ -140,9 +149,9 @@ export const googlePlacesProxy = onRequest(
   },
   async (req, res) => {
     req.app?.set("trust proxy", true);
-    await runMiddleware(req, res, apiLimiter);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, apiLimiter);
     if (res.headersSent) return;
-    await runMiddleware(req, res, requireAdmin);
+    await runMiddleware(req as unknown as Request, res as unknown as Response, requireAdmin);
     if (res.headersSent) return;
 
     // action: 'nearby' | 'autocomplete' | 'geocode' | 'details' | 'photo'
@@ -267,7 +276,7 @@ export const twilioWebhook = onRequest(
     cors: false,
     secrets: ["TWILIO_AUTH_TOKEN"],
   },
-  (req, res) => handleIncomingWhatsApp(req as any, res as any),
+  (req, res) => handleIncomingWhatsApp(req as unknown as Request, res as unknown as Response),
 );
 
 // 9. Twilio Message Status Webhook
@@ -278,7 +287,7 @@ export const twilioStatus = onRequest(
     cors: false,
     secrets: ["TWILIO_AUTH_TOKEN"],
   },
-  (req, res) => handleMessageStatus(req as any, res as any),
+  (req, res) => handleMessageStatus(req as unknown as Request, res as unknown as Response),
 );
 
 // 10.5 Email Webhook (for provider callbacks)
@@ -289,7 +298,7 @@ export const emailWebhook = onRequest(
     cors: false,
     secrets: ["EMAIL_WEBHOOK_SECRET"],
   },
-  (req, res) => handleEmailWebhook(req as any, res as any),
+  (req, res) => handleEmailWebhook(req as unknown as Request, res as unknown as Response),
 );
 
 // 10. Connect V1.5 Functions
@@ -309,5 +318,22 @@ export const claimAdmin = onRequest(
     memory: "256MiB",
     cors: true,
   },
-  (req, res) => claimAdminRole(req as any, res as any),
+  (req, res) => claimAdminRole(req as unknown as Request, res as unknown as Response),
 );
+
+// 13. Bookings Module (Callable Functions)
+export {
+  createBooking,
+  getBooking,
+  getMyBookings,
+  confirmBooking,
+  completeBooking,
+  cancelBooking,
+} from "./modules/bookings";
+
+// 14. Notifications Module (Callable Functions)
+export {
+  getMyNotifications,
+  markNotificationRead,
+  getUnreadNotificationCount,
+} from "./modules/notifications";

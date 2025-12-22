@@ -1,19 +1,49 @@
 import { db } from '../../config/firebase';
+import { asToolContext, UserIdOrToolContext } from './toolContext';
+import { getErrorMessage } from '../../utils/errors';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Arguments
+// ─────────────────────────────────────────────────────────────────────────────
 
+interface EmptyArgs {
+    // No required args - used for queries that only need userId from context
+}
 
+interface UpdateUserProfileArgs {
+    persona?: string;
+    interests?: string[];
+    budget?: string;
+    location?: string;
+}
+
+interface SaveFavoriteArgs {
+    itemId: string;
+    title: string;
+    domain?: string;
+}
+
+interface ListFavoritesArgs {
+    limit?: number;
+}
 
 interface ToolResult {
     success: boolean;
     error?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User Tools Implementation
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const userTools = {
     /**
      * Get user profile information
      */
-    getUserProfile: async (_args: any, userId: string): Promise<ToolResult> => {
+    getUserProfile: async (_args: EmptyArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const ctx = asToolContext(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -35,11 +65,11 @@ export const userTools = {
                 success: true,
                 profile: userDoc.data()
             };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("🔴 [UserProfile] Failed:", err);
             return {
                 success: false,
-                error: err.message || 'Failed to get user profile'
+                error: getErrorMessage(err) || 'Failed to get user profile'
             };
         }
     },
@@ -47,7 +77,9 @@ export const userTools = {
     /**
      * Update user profile/preferences
      */
-    updateUserProfile: async (args: any, userId: string): Promise<ToolResult> => {
+    updateUserProfile: async (args: UpdateUserProfileArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const ctx = asToolContext(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -66,11 +98,11 @@ export const userTools = {
             }, { merge: true });
 
             return { success: true };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("🔴 [UpdateProfile] Failed:", err);
             return {
                 success: false,
-                error: err.message || 'Failed to update profile'
+                error: getErrorMessage(err) || 'Failed to update profile'
             };
         }
     },
@@ -78,7 +110,9 @@ export const userTools = {
     /**
      * Save an item to favorites
      */
-    saveFavoriteItem: async (args: any, userId: string): Promise<ToolResult> => {
+    saveFavoriteItem: async (args: SaveFavoriteArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const ctx = asToolContext(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -95,11 +129,11 @@ export const userTools = {
                 createdAt: new Date().toISOString()
             });
             return { success: true };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("🔴 [SaveFavorite] Failed:", err);
             return {
                 success: false,
-                error: err.message || 'Failed to save favorite'
+                error: getErrorMessage(err) || 'Failed to save favorite'
             };
         }
     },
@@ -107,7 +141,9 @@ export const userTools = {
     /**
      * List user favorites
      */
-    listFavorites: async (_args: any, userId: string): Promise<ToolResult> => {
+    listFavorites: async (_args: ListFavoritesArgs, userIdOrContext: UserIdOrToolContext): Promise<ToolResult> => {
+        const ctx = asToolContext(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -121,11 +157,11 @@ export const userTools = {
                 success: true,
                 favorites: snap.docs.map(d => d.data())
             };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("🔴 [ListFavorites] Failed:", err);
             return {
                 success: false,
-                error: err.message || 'Failed to list favorites'
+                error: getErrorMessage(err) || 'Failed to list favorites'
             };
         }
     }

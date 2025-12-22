@@ -8,14 +8,26 @@ exports.onTaxiStatusChange = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const firebase_1 = require("../config/firebase");
 const generative_ai_1 = require("@google/generative-ai");
-const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Initialize Gemini lazily
+let genAI = null;
+const getGenAI = () => {
+    if (!genAI) {
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        if (!GEMINI_API_KEY) {
+            return null;
+        }
+        genAI = new generative_ai_1.GoogleGenerativeAI(GEMINI_API_KEY);
+    }
+    return genAI;
+};
 /**
  * Trigger when taxi_requests/{requestId} is updated
  * When status changes to "assigned", notify the customer via agent
  */
 exports.onTaxiStatusChange = (0, firestore_1.onDocumentUpdated)({
     document: "taxi_requests/{requestId}",
-    region: "europe-west1"
+    region: "europe-west1",
+    secrets: ['GEMINI_API_KEY']
 }, async (event) => {
     var _a, _b, _c, _d;
     const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
@@ -38,6 +50,11 @@ exports.onTaxiStatusChange = (0, firestore_1.onDocumentUpdated)({
         console.log(`✅ [Taxi Trigger] Driver assigned to request ${requestId}`);
         console.log(`   Driver: ${driverName}, Vehicle: ${vehicleType}`);
         try {
+            const client = getGenAI();
+            if (!client) {
+                console.warn('⚠️ [Taxi Trigger] GEMINI_API_KEY missing; skipping proactive message');
+                return;
+            }
             // Find the user's active chat session
             const sessionsSnap = await firebase_1.db.collection('chat_sessions')
                 .where('userId', '==', userId)
@@ -104,7 +121,12 @@ TAXI DETAILS:
 - Destination: ${taxiInfo.dropoffAddress || 'N/A'}
 
 Generate a friendly, enthusiastic message to inform the user that their taxi has been confirmed. Include the driver's name and key details. Keep it conversational and reassuring. Do NOT ask any questions - just inform them.`;
-        const model = genAI.getGenerativeModel({
+        const client = getGenAI();
+        if (!client) {
+            console.warn('⚠️ [Agent Response] GEMINI_API_KEY missing; skipping proactive response');
+            return;
+        }
+        const model = client.getGenerativeModel({
             model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
             systemInstruction: systemPrompt
         }, { apiVersion: 'v1beta' });

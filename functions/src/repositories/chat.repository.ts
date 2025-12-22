@@ -1,5 +1,37 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config/firebase';
+
+// ============================================
+// PENDING ACTION (Confirmation Gate)
+// ============================================
+
+/**
+ * Represents a pending action that requires user confirmation.
+ * Stored on the chat session document.
+ * 
+ * Kinds:
+ * - confirm_transaction: Booking ledger transaction
+ * - confirm_order: Food order (V1)
+ * - confirm_service: Service request (V1)
+ */
+export type PendingActionKind = 'confirm_transaction' | 'confirm_order' | 'confirm_service';
+
+export interface PendingAction {
+    kind: PendingActionKind;
+
+    // For confirm_transaction (legacy booking ledger)
+    businessId?: string;
+    txId?: string;
+
+    // For confirm_order / confirm_service (V1 consumer tools)
+    orderId?: string;
+    requestId?: string;
+
+    holdExpiresAt: Date;         // When confirmation expires
+    summary: string;             // What user is confirming (e.g., "Table for 2 at Restaurant XYZ")
+    expectedUserId: string;      // Prevents cross-user confirmation
+    createdAt: Date;
+}
 
 export const chatRepository = {
     // 1. Get or Create Session Metadata
@@ -49,7 +81,7 @@ export const chatRepository = {
 
     // 3. Save Message
     // We allow saving 'parts' array directly to support Tool Calls in the future
-    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string; [key: string]: any }) => {
+    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string;[key: string]: any }) => {
         const messageData: any = {
             role,
             parts,
@@ -76,5 +108,72 @@ export const chatRepository = {
             lastMessageAt: new Date().toISOString(),
             messageCount: FieldValue.increment(1)
         });
-    }
+    },
+
+    // ============================================
+    // 4. PENDING ACTION METHODS (Confirmation Gate)
+    // ============================================
+
+    /**
+     * Set a pending action that requires user confirmation.
+     * The confirmation gate checks this before allowing LLM to process.
+     */
+    setPendingAction: async (sessionId: string, action: PendingAction): Promise<void> => {
+        await db.collection('chatSessions').doc(sessionId).update({
+            pendingAction: {
+                kind: action.kind,
+                // Transaction fields
+                businessId: action.businessId || null,
+                txId: action.txId || null,
+                // Consumer tool fields
+                orderId: action.orderId || null,
+                requestId: action.requestId || null,
+                // Common fields
+                holdExpiresAt: Timestamp.fromDate(action.holdExpiresAt),
+                summary: action.summary,
+                expectedUserId: action.expectedUserId,
+                createdAt: Timestamp.fromDate(action.createdAt),
+            }
+        });
+    },
+
+    /**
+     * Get the pending action for a session, if any.
+     * Returns null if no pending action or if it belongs to a different user.
+     */
+    getPendingAction: async (sessionId: string, userId?: string): Promise<PendingAction | null> => {
+        const doc = await db.collection('chatSessions').doc(sessionId).get();
+        if (!doc.exists) return null;
+
+        const data = doc.data();
+        const pending = data?.pendingAction;
+        if (!pending) return null;
+
+        // Verify user matches if userId provided
+        if (userId && pending.expectedUserId !== userId) {
+            console.warn(`[ChatRepo] Pending action userId mismatch: expected ${pending.expectedUserId}, got ${userId}`);
+            return null;
+        }
+
+        return {
+            kind: pending.kind,
+            businessId: pending.businessId || undefined,
+            txId: pending.txId || undefined,
+            orderId: pending.orderId || undefined,
+            requestId: pending.requestId || undefined,
+            holdExpiresAt: pending.holdExpiresAt?.toDate() || new Date(),
+            summary: pending.summary,
+            expectedUserId: pending.expectedUserId,
+            createdAt: pending.createdAt?.toDate() || new Date(),
+        };
+    },
+
+    /**
+     * Clear the pending action after confirmation or cancellation.
+     */
+    clearPendingAction: async (sessionId: string): Promise<void> => {
+        await db.collection('chatSessions').doc(sessionId).update({
+            pendingAction: FieldValue.delete()
+        });
+    },
 };

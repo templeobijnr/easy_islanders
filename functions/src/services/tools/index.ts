@@ -21,6 +21,13 @@ import { socialTools } from './social.tools';
 import { businessTools } from './business.tools';
 import { miscTools } from './misc.tools';
 import { itineraryTools } from './itinerary.tools';
+import { requestsTools } from './requests.tools';
+import { addressBookTools } from './addressBook.tools';
+
+// V1 Consumer Tools
+import { foodTools } from './food.tools';
+import { serviceTools } from './service.tools';
+import { infoTools } from './info.tools';
 
 /**
  * Unified tool resolvers export
@@ -52,7 +59,18 @@ export const toolResolvers = {
     ...itineraryTools,
 
     // Miscellaneous (Encyclopedia, Weather, etc.)
-    ...miscTools
+    ...miscTools,
+
+    // Requests (Services, Orders)
+    ...requestsTools,
+
+    // Address Book (deliveries)
+    ...addressBookTools,
+
+    // V1 Consumer Tools
+    ...foodTools,
+    ...serviceTools,
+    ...infoTools,
 };
 
 /**
@@ -67,6 +85,13 @@ export {
     userTools,
     socialTools,
     businessTools,
+
     itineraryTools,
-    miscTools
+    miscTools,
+    requestsTools,
+
+    // V1 Consumer Tools
+    foodTools,
+    serviceTools,
+    infoTools,
 };

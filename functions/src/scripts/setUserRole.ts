@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errors';
 /**
  * Simple script to set a Firebase Auth custom claim `role`
  * for a given user (e.g. 'admin' or 'business').
@@ -50,8 +51,8 @@ async function main() {
       "ℹ️ User must sign out and sign back in for the new role to take effect in ID tokens.",
     );
     process.exit(0);
-  } catch (err: any) {
-    console.error("❌ Failed to set role:", err?.message || err);
+  } catch (err: unknown) {
+    console.error("❌ Failed to set role:", getErrorMessage(err) || err);
     process.exit(1);
   }
 }

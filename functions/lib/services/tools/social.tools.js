@@ -3,10 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.socialTools = void 0;
 const firebase_1 = require("../../config/firebase");
 const firestore_1 = require("firebase-admin/firestore");
+const toolContext_1 = require("./toolContext");
 const now = firestore_1.FieldValue.serverTimestamp;
 exports.socialTools = {
     // --- Tribes ---
-    createTribe: async (args, userId) => {
+    createTribe: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -19,7 +21,8 @@ exports.socialTools = {
             return { success: false, error: err.message };
         }
     },
-    joinTribe: async (args, userId) => {
+    joinTribe: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -30,7 +33,8 @@ exports.socialTools = {
             return { success: false, error: err.message };
         }
     },
-    leaveTribe: async (args, userId) => {
+    leaveTribe: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -41,7 +45,8 @@ exports.socialTools = {
             return { success: false, error: err.message };
         }
     },
-    postToTribe: async (args, userId) => {
+    postToTribe: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -83,7 +88,8 @@ exports.socialTools = {
         }
     },
     // --- Waves ---
-    waveUser: async (args, userId) => {
+    waveUser: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -96,7 +102,8 @@ exports.socialTools = {
             return { success: false, error: err.message };
         }
     },
-    acceptWave: async (args, userId) => {
+    acceptWave: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -127,7 +134,8 @@ exports.socialTools = {
             return { success: false, error: err.message };
         }
     },
-    checkInToPlace: async (args, userId) => {
+    checkInToPlace: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {

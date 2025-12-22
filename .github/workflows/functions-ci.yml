@@ -1,0 +1,65 @@
+name: Functions CI
+
+on:
+  pull_request:
+    paths:
+      - "functions/**"
+      - ".github/workflows/functions-ci.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "functions/**"
+      - ".github/workflows/functions-ci.yml"
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C functions run lint
+      - run: pnpm -C functions run build
+      - run: pnpm -C functions test
+      - run: pnpm -C functions run check:boundaries
+
+  integration:
+    # Run on: schedule, main push, OR PRs touching ledger/execution code
+    if: |
+      github.event_name == 'schedule' || 
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.pull_request.changed_files, 'transaction') ||
+      contains(github.event.pull_request.changed_files, 'execution')
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C functions run build
+      - run: pnpm exec firebase emulators:exec --only firestore --project test-project "pnpm -C functions run test:integration"

@@ -7,10 +7,39 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Helper: admin check via custom claim only
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
     // --- USER FILES ---
     // Users can only access their own files
     match /users/{userId}/{allPaths=**} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // --- CATALOG IMAGES (Admin uploads) ---
+    // Public read, only admins can write
+    match /catalog/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- PLACES IMPORT (1-Click Onboarding) ---
+    // Public read, only admins can write
+    match /places_import/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- CATALOG IMPORTS (Menu/Product Import) ---
+    // Temporary uploads for catalog extraction - authenticated users can write
+    match /catalog-imports/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && request.resource.size < 20 * 1024 * 1024  // 20MB limit
+                   && (request.resource.contentType.matches('image/.*') ||
+                       request.resource.contentType.matches('application/pdf'));
     }
 
     // --- LISTING IMAGES ---
@@ -18,6 +47,30 @@ service firebase.storage {
     match /listings/{listingId}/{allPaths=**} {
       allow read: if true;
       allow write: if isAuthenticated();
+    }
+
+    // --- BUSINESS IMAGES (Dashboard Profile Uploads) ---
+    // Public read, authenticated business owners can write
+    match /business_images/{businessId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // --- BUSINESS KNOWLEDGE ASSETS (V1, tenant-scoped) ---
+    // Private to the claimed owner (used for ingestion/RAG).
+    match /businesses/{businessId}/{allPaths=**} {
+      allow read: if isAuthenticated()
+        && request.auth.token.businessId == businessId
+        && request.auth.token.role == 'owner';
+
+      allow write: if isAuthenticated()
+        && request.auth.token.businessId == businessId
+        && request.auth.token.role == 'owner'
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024  // 10MB limit
+        && (request.resource.contentType.matches('image/.*') ||
+            request.resource.contentType.matches('application/pdf') ||
+            request.resource.contentType.matches('text/.*'));
     }
 
     // --- PROFILE IMAGES ---
@@ -33,6 +86,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if isAuthenticated();
     }
+    // Match code path in socialService.ts: social_images/${userId}/${filename}
+    match /social_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
 
     // --- RECEIPTS ---
     // Private receipts - only owner can access
@@ -40,10 +98,30 @@ service firebase.storage {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
 
+    // --- ACTIVITY IMAGES ---
+    // Public read, authenticated write
+    match /activities/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // --- EVENT IMAGES ---
+    // Public read, authenticated write (for curation modal uploads)
+    match /events/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     // --- FILE SIZE AND TYPE VALIDATION ---
-    // Enforce file size limits (5MB for images, 10MB for documents)
+    // Enforce file size limits (20MB max)
+    // SECURITY: Explicitly exclude admin-only paths (catalog, places_import)
+    // These paths have their own rules above that require isAdmin()
     match /{allPaths=**} {
-      allow write: if request.resource.size < 10 * 1024 * 1024  // 10MB limit
+      allow write: if isAuthenticated()
+                   && !allPaths.matches('^businesses/.*')
+                   && !allPaths.matches('^catalog/.*')
+                   && !allPaths.matches('^places_import/.*')
+                   && request.resource.size < 20 * 1024 * 1024  // 20MB limit
                    && (request.resource.contentType.matches('image/.*') ||
                        request.resource.contentType.matches('application/pdf') ||
                        request.resource.contentType.matches('text/.*'));

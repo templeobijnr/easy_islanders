@@ -1,0 +1,322 @@
+src/types/business.ts:25:  createdAt?: any;  // Firestore timestamp
+src/types/UnifiedListing.ts:62:    merve?: any; // MerveConfig
+src/context/AuthContext.tsx:140:    const handleMetadataChange = async (snapshot: any) => {
+src/utils/placeUtils.ts:74:export const transformGooglePlace = (googlePlace: any): Place => {
+src/utils/placeUtils.ts:82:        images = googlePlace.photos.map((p: any) => p.getUrl ? p.getUrl({ maxWidth: 400 }) : '');
+src/utils/logger.ts:4:  log: (...args: any[]) => {
+src/utils/logger.ts:7:  warn: (...args: any[]) => {
+src/utils/logger.ts:10:  error: (...args: any[]) => {
+src/utils/logger.ts:13:  debug: (...args: any[]) => {
+src/dashboard/shared/MenuFormModal.tsx:13:  onSave: (item: any) => Promise<void>;
+src/dashboard/shared/MenuFormModal.tsx:14:  initialData?: any;
+src/dashboard/shared/MenuFormModal.tsx:63:            setForm((prev: any) => ({
+src/dashboard/shared/MenuFormModal.tsx:74:      setForm((prev: any) => {
+src/dashboard/shared/MenuFormModal.tsx:102:              setForm((prev: any) => ({
+src/dashboard/shared/ServiceFormModal.tsx:12:  onSave: (item: any) => Promise<void>;
+src/dashboard/shared/ServiceFormModal.tsx:13:  initialData?: any;
+src/dashboard/shared/ServiceFormModal.tsx:68:            setForm((prev: any) => ({
+src/dashboard/shared/ServiceFormModal.tsx:89:      setForm((prev: any) => {
+src/dashboard/shared/VehicleFormModal.tsx:13:  onSave: (vehicle: any) => Promise<void>;
+src/dashboard/shared/VehicleFormModal.tsx:63:            setForm((prev: any) => ({
+src/dashboard/shared/VehicleFormModal.tsx:86:      setForm((prev: any) => {
+src/dashboard/shared/VehicleFormModal.tsx:258:                                            <button onClick={() => setForm((prev: any) => ({...prev, images: prev.images?.filter((_: any, i: number) => i !== idx)}))} className="p-2 bg-white text-red-500 rounded-full"><Trash2 size={16}/></button>
+src/dashboard/shared/VehicleFormModal.tsx:259:                                            <button onClick={() => setForm((prev: any) => ({...prev, imageUrl: img}))} className={`p-2 rounded-full ${form.imageUrl === img ? 'bg-yellow-400 text-white' : 'bg-white text-slate-400'}`}><Star size={16}/></button>
+src/dashboard/shared/ProductFormModal.tsx:13:  onSave: (product: any) => Promise<void>;
+src/dashboard/shared/ProductFormModal.tsx:65:            setForm((prev: any) => ({
+src/dashboard/shared/ProductFormModal.tsx:221:                                            <button onClick={() => setForm((prev: any) => ({...prev, images: prev.images?.filter((_: any, i: number) => i !== idx)}))} className="p-2 bg-white text-red-500 rounded-full"><Trash2 size={16}/></button>
+src/dashboard/shared/ProductFormModal.tsx:222:                                            <button onClick={() => setForm((prev: any) => ({...prev, imageUrl: img}))} className={`p-2 rounded-full ${form.imageUrl === img ? 'bg-yellow-400 text-white' : 'bg-white text-slate-400'}`}><Star size={16}/></button>
+src/dashboard/shared/EventFormModal.tsx:13:  onSave: (event: any) => Promise<void>;
+src/dashboard/shared/EventFormModal.tsx:14:  initialData?: any;
+src/dashboard/shared/EventFormModal.tsx:67:            setForm((prev: any) => ({
+src/dashboard/shared/EventFormModal.tsx:84:            setForm((prev: any) => ({
+src/dashboard/shared/EventFormModal.tsx:96:      setForm((prev: any) => ({ ...prev, uploadedVideo: '' }));
+src/dashboard/shared/PropertyFormModal.tsx:17:    onSave: (property: any) => Promise<void>;
+src/dashboard/shared/PropertyFormModal.tsx:118:                const features = (data.features || []).filter((f: any) => f.place_name);
+src/dashboard/shared/PropertyFormModal.tsx:159:                mapRef.current.on('click', (e: any) => {
+src/dashboard/shared/PropertyFormModal.tsx:160:                    setForm((prev: any) => ({ ...prev, latitude: e.lngLat.lat, longitude: e.lngLat.lng }));
+src/dashboard/shared/PropertyFormModal.tsx:173:    const placeMarker = (mapboxgl: any, lng?: number, lat?: number) => {
+src/dashboard/shared/PropertyFormModal.tsx:184:    const buildLocationFromFeature = (feature: any) => {
+src/dashboard/shared/PropertyFormModal.tsx:187:        const district = ctx.find((c: any) => c.id?.startsWith('place') || c.id?.startsWith('locality'))?.text || feature.text;
+src/dashboard/shared/PropertyFormModal.tsx:188:        const region = ctx.find((c: any) => c.id?.startsWith('region'))?.text;
+src/dashboard/shared/PropertyFormModal.tsx:189:        const country = ctx.find((c: any) => c.id?.startsWith('country'))?.text;
+src/dashboard/shared/PropertyFormModal.tsx:209:                setForm((prev: any) => ({
+src/dashboard/shared/PropertyFormModal.tsx:220:    const handleSuggestionSelect = async (feature: any) => {
+src/dashboard/shared/PropertyFormModal.tsx:223:        setForm((prev: any) => ({
+src/dashboard/shared/PropertyFormModal.tsx:247:            setForm((prev: any) => ({ ...prev, latitude, longitude }));
+src/dashboard/shared/PropertyFormModal.tsx:271:                setForm((prev: any) => ({
+src/dashboard/shared/PropertyFormModal.tsx:321:                setForm((prev: any) => ({
+src/dashboard/shared/PropertyFormModal.tsx:819:                                            <button onClick={() => setForm((prev: any) => ({ ...prev, images: prev.images?.filter((_: any, i: number) => i !== idx) }))} className="p-2 bg-white text-red-500 rounded-full"><Trash2 size={16} /></button>
+src/dashboard/shared/PropertyFormModal.tsx:820:                                            <button onClick={() => setForm((prev: any) => ({ ...prev, imageUrl: img }))} className={`p-2 rounded-full ${form.imageUrl === img ? 'bg-yellow-400 text-white' : 'bg-white text-slate-400'}`}><Star size={16} /></button>
+src/dashboard/shared/PropertyFormModal.tsx:851:                                                {locationSuggestions.map((feat: any) => (
+src/dashboard/modules/OverviewModule.test.tsx:17:    fetchWithAuth: vi.fn(async (_firebaseUser: any, path: string) => {
+src/dashboard/modules/InboxModule.tsx:60:   const toDate = (value: any): Date => {
+src/dashboard/modules/InboxModule.tsx:78:         const sessions: ChatSession[] = (data.sessions || []).map((s: any) => ({
+src/dashboard/modules/InboxModule.tsx:98:         const loaded: Lead[] = (data.leads || []).map((l: any) => ({
+src/dashboard/modules/InboxModule.tsx:121:         const messages = (data.messages || []).map((m: any) => ({
+src/dashboard/modules/KnowledgeModule.tsx:87:      const loadedAssets: KnowledgeAsset[] = data.assets.map((asset: any) => ({
+src/dashboard/modules/crm/ImportWizard.tsx:7:  onImport: (contacts: any[]) => void;
+src/dashboard/modules/OverviewModule.tsx:50:            const toDate = (value: any): Date | null => {
+src/dashboard/modules/OverviewModule.tsx:77:                const chatsToday = sessions.filter((s: any) => {
+src/dashboard/modules/CRMModule.tsx:140:   const handleImport = async (importedData: any[]) => {
+src/components/admin/BookingMessagesModal.tsx:36:const parseDate = (value: any): Date | null => {
+src/components/admin/AdminManagement.tsx:12:  createdAt: any;
+src/components/admin/Shared/LocationPicker.tsx:87:                    const mapped = data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/sections/OfferingsManager.tsx:54:  createdAt?: any;
+src/components/admin/CatalogManager/Forms/EventForm.tsx:171:                    setImportSuggestions(data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/Forms/ActivityForm.tsx:198:                    setImportSuggestions(data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/Forms/ActivityForm.tsx:279:                setImportSuggestions(data.results.map((r: any) => ({
+src/components/admin/CatalogManager/Forms/ExperienceForm.tsx:177:                    setImportSuggestions(data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/Forms/ExperienceForm.tsx:257:                setImportSuggestions(data.results.map((r: any) => ({
+src/components/admin/CatalogManager/Forms/PlaceForm.tsx:315:            data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/Forms/PlaceForm.tsx:431:          data.results.map((r: any) => ({
+src/components/admin/CatalogManager/GooglePlacesProxy.test.ts:27:      (p: any) =>
+src/components/admin/CatalogManager/hooks/useGoogleImport.ts:50:            data.predictions.map((p: any) => ({
+src/components/admin/CatalogManager/hooks/useGoogleImport.ts:131:          data.results.map((r: any) => ({
+src/components/admin/CatalogManager/PricingBuilder.tsx:11:const MODEL_OPTIONS: { value: PricingModel; label: string; icon: any; desc: string }[] = [
+src/components/admin/CatalogManager/PricingBuilder.tsx:71:    const updateOption = (id: string, field: keyof PricingOption, val: any) => {
+src/components/admin/ConnectManager/PinsDeck.tsx:90:            const pinData: any = {
+src/components/admin/ConnectManager/ModerationDeck.tsx:16:    startTime?: any;
+src/components/admin/ConnectManager/ModerationDeck.tsx:73:    const formatDate = (timestamp: any) => {
+src/components/admin/ConnectManager/LiveFeedDeck.tsx:34:    const getTimeAgo = (timestamp: any): string => {
+src/components/consumer/MessagesView.tsx:57:const parseDate = (value: any): Date | null => {
+src/components/consumer/PromotionsView.tsx:43:      const boosted = all.filter((i: any) => i.isBoosted === true);
+src/hooks/useTaxiRequest.ts:54:  createdAt: any;
+src/hooks/useTaxiRequest.ts:55:  acceptedAt?: any;
+src/hooks/useTaxiRequest.ts:56:  completedAt?: any;
+src/pages/discover/index.tsx:281:  const handleConfirmBooking = async (range: DateRange, guests: number, total: number, guestDetails: any) => {
+src/pages/discover/index.tsx:320:    guestDetails: any,
+src/pages/discover/index.tsx:364:    guestDetails: any,
+src/pages/discover/index.tsx:403:    guestDetails: any,
+src/pages/discover/index.tsx:446:    guestDetails: any,
+src/pages/discover/index.tsx:485:  const renderCard = (item: any, onClick: () => void, priceLabel: string) => (
+src/pages/chat/cards/TaxiStatusCard.tsx:37:  createdAt: any;
+src/pages/chat/cards/TaxiStatusCard.tsx:38:  assignedAt?: any;
+src/pages/admin/MerveController.tsx:38:    updatedAt: any;
+src/pages/admin/RequestsConsole.tsx:19:            const filters: any = {};
+src/pages/explore/FilterBar.tsx:29:   domains: { id: string; label: string; icon: any }[];
+src/pages/connect/PlaceBookingModule.tsx:9:  onBook: (range: DateRange, guests: number, total: number, guestDetails: any) => void;
+src/pages/connect/StampsModal.tsx:32:                    {stamps.map((stamp: any) => (
+src/pages/connect/EventBookingModule.tsx:9:  onBook: (range: DateRange, tickets: number, total: number, guestDetails: any) => void;
+src/pages/connect/EventBookingModule.tsx:12:const toDate = (value: any): Date => {
+src/pages/connect/StayBookingModule.tsx:42:    guestDetails: any,
+src/pages/connect/ExperienceBookingModule.tsx:9:  onBook: (range: DateRange, guests: number, total: number, guestDetails: any) => void;
+src/pages/connect/PinBookingModule.tsx:40:    guestDetails: any,
+src/pages/connect/MapboxIslandMap.tsx:449:    range: any,
+src/pages/connect/MapboxIslandMap.tsx:452:    guestDetails?: any,
+src/pages/connect/ActivityBookingModule.tsx:9:  onBook: (range: DateRange, guests: number, total: number, guestDetails: any) => void;
+src/pages/merchant/MerchantJobs.tsx:216:      .map((i: any) => `${i.quantity}x ${i.name}`)
+src/services/placesService.ts:17:  const cleaned: any = {};
+src/services/socialService.ts:285:  async ensureUserProfile(user: any): Promise<SocialUser> {
+src/services/socialService.ts:498:        const connectNotification: any = {
+src/services/socialService.ts:520:        const notification: any = {
+src/services/listingsService.ts:21:  const cleaned: any = {};
+src/services/eventsService.ts:37:  createEvent: async (data: Partial<FirestoreEvent> & { title: string; startTime: any }) => {
+src/services/storageService.ts:48:const wrapWithEmit = (module: any, eventName: string) => {
+src/services/storageService.ts:49:  const wrapped: any = {};
+src/services/storageService.ts:52:      wrapped[key] = async (...args: any[]) => {
+src/services/storage/utils.test.ts:11:    const obj: any = { a: 1 };
+src/services/storage/utils.ts:2:export const sanitizeData = (value: any): any => {
+src/services/storage/utils.ts:5:  const walk = (val: any): any => {
+src/services/storage/utils.ts:25:      const out: any = {};
+src/services/storage/crm.ts:23:        const data: any = doc.data();
+src/services/storage/crm.ts:26:          tags: Array.isArray(data.tags) ? data.tags.filter((t: any) => typeof t === 'string') : [],
+src/services/storage/crm.ts:87:  saveConversation: async (conversation: any): Promise<void> => {
+src/services/storage/listings.ts:31:  const data: any = raw && typeof raw === "object" ? (raw as any) : {};
+src/services/storage/listings.ts:62:      let q: any = collection(db, COLLECTION);
+src/services/storage/social.ts:60:        const data: any = doc.data();
+src/services/storage/social.ts:93:  saveConversation: async (convo: any): Promise<void> => {
+src/services/unifiedListingsService.ts:27:    const cleaned: any = {};
+src/services/activitiesService.ts:19:  const cleaned: any = {};
+src/services/connectService.ts:425:    todayItems: any[];
+src/services/connectService.ts:426:    weekItems: any[];
+src/services/connectService.ts:427:    trendingItems: any[];
+src/services/connectService.ts:428:    featuredItems: any[];
+src/services/connectService.ts:516:    const items: any[] = [];
+src/services/connectService.ts:519:    const processDoc = (doc: any, type: string) => {
+src/services/connectService.ts:583:    return snap.docs.map(d => ({ id: d.id, ...d.data(), type: 'event' })).sort((a: any, b: any) => {
+src/services/connectService.ts:632:function getDate(val: any): Date | null {
+functions/src/middleware/requireBusinessMatch.test.ts:4:    const res: any = {};
+functions/src/middleware/requireBusinessMatch.test.ts:11:    res.json = (payload: any) => {
+functions/src/middleware/requireBusinessMatch.test.ts:20:        const req: any = {
+functions/src/middleware/requireBusinessMatch.test.ts:35:        const req: any = {
+functions/src/middleware/requireBusinessMatch.test.ts:50:        const req: any = {
+functions/src/types/chat.ts:20:  metadata?: any;
+functions/src/types/v1.ts:168:  polygon?: any; // GeoJSON
+functions/src/types/domain.ts:43:    [key: string]: any;
+functions/src/triggers/catalog-ingest.triggers.ts:518:    let parsed: any;
+functions/src/triggers/catalog-ingest.triggers.ts:527:        .filter((it: any) => it && typeof it === 'object' && typeof it.name === 'string' && it.name.trim().length > 0)
+functions/src/triggers/catalog-ingest.triggers.ts:528:        .map((it: any) => {
+functions/src/triggers/catalog-ingest.triggers.ts:554:    item: any,
+functions/src/repositories/knowledge.repository.ts:114:        const updateData: any = {
+functions/src/repositories/knowledge.repository.ts:264:                const data: any = doc.data();
+functions/src/repositories/businessChat.repository.ts:84:            const session: any = sessionSnap.data() || {};
+functions/src/repositories/businessChat.repository.ts:139:            const session: any = sessionSnap.data() || {};
+functions/src/repositories/availability.repository.ts:9:  createdAt?: any;
+functions/src/repositories/availability.repository.ts:10:  updatedAt?: any;
+functions/src/repositories/business.repository.ts:124:                    const listing: any = listingDoc.data() || {};
+functions/src/repositories/business.repository.ts:387:                    const listing: any = listingSnap.data() || {};
+functions/src/repositories/transaction.repository.test.ts:23:    get: jest.fn((ref: any) => {
+functions/src/repositories/chat.repository.ts:84:    saveMessage: async (sessionId: string, role: 'user' | 'model', parts: any[], meta?: { userId?: string; agentId?: string;[key: string]: any }) => {
+functions/src/repositories/chat.repository.ts:85:        const messageData: any = {
+functions/src/repositories/message.repository.ts:9:  createdAt?: any;
+functions/src/repositories/merveListings.repository.ts:11:function normalizeMerve(merve: any): MerveIntegration | null {
+functions/src/repositories/merveListings.repository.ts:16:    const actionsRaw: any[] = Array.isArray(merve.actions) ? merve.actions : [];
+functions/src/repositories/merveListings.repository.ts:32:            tags: Array.isArray(a.tags) ? a.tags.filter((t: any) => typeof t === 'string') : undefined,
+functions/src/http/v1/jobs/dispatch.ts:62:      .map((i: any) => `${i.quantity}x ${i.name}`)
+functions/src/scripts/populateListings.ts:600:    data: any,
+functions/src/scripts/testSearch.ts:30:    allResults.hits?.forEach((h: any) => {
+functions/src/scripts/testSearch.ts:48:    eventResults.hits?.forEach((h: any) => {
+functions/src/api/controllers/admin.controller.ts:136:        const updates: any = {};
+functions/src/api/controllers/catalog-ingest.controller.ts:16:function isIngestKind(kind: any): kind is IngestKind {
+functions/src/api/controllers/catalog-ingest.controller.ts:47:function normalizeSources(raw: any): IngestSource[] {
+functions/src/api/controllers/products.controller.ts:124:        const createdProducts: any[] = [];
+functions/src/api/services/knowledge-ingestion.service.ts:569:    const buffered: any[] = [];
+functions/src/api/services/url-extraction.service.ts:101:        let response: any = null;
+functions/src/index.ts:17:const runMiddleware = (req: any, res: any, fn: any) =>
+functions/src/controllers/chat.controller.ts:413:    let listings: any[] = [];
+functions/src/controllers/chat.controller.ts:433:      const functionResponseParts: any[] = [];
+functions/src/controllers/chat.controller.ts:442:        let toolResult: any = {};
+functions/src/controllers/chat.controller.ts:456:            const simplifiedItems = (items || []).map((i: any) => ({
+functions/src/controllers/chat.controller.ts:543:            const enrichedArgs: any = { ...fnArgs };
+functions/src/controllers/chat.controller.ts:664:            candidates: response.candidates?.map((c: any) => ({
+functions/src/controllers/chat.controller.ts:699:    const modelMessageMeta: any = { userId: user.uid, agentId };
+functions/src/controllers/import.controller.ts:243:    let aiData: any = {};
+functions/src/controllers/business-chat.controller.ts:277:        const toolResults: any[] = [];
+functions/src/controllers/business-chat.controller.ts:358:): Promise<{ name: string; result: any }> {
+functions/src/controllers/products.controller.ts:48:        const toMillis = (value: any): number => {
+functions/src/controllers/products.controller.ts:65:        products.sort((a: any, b: any) => {
+functions/src/controllers/twilio.controller.internal.ts:62:        const updateData: any = {
+functions/src/controllers/knowledge.controller.ts:211:            createdAt: any;
+functions/src/scheduled/invariants.scheduled.ts:140:            const violationDetails: any[] = [];
+functions/src/notifications/bookingNotifications.ts:107:    const parseDate = (value: any): Date | null => {
+functions/src/services/scraper/embedded.ts:26:    jsonData: any[];
+functions/src/services/scraper/embedded.ts:128:function parseLooseJson(str: string): any {
+functions/src/services/scraper/embedded.ts:148:function findProductArrays(obj: any, depth = 0): any[] {
+functions/src/services/scraper/embedded.ts:152:    const results: any[] = [];
+functions/src/services/scraper/embedded.ts:187:function extractFromJsonLd(jsonLdArray: any[]): any[] {
+functions/src/services/scraper/embedded.ts:188:    const products: any[] = [];
+functions/src/services/scraper/embedded.ts:265:        let jsonData: any = null;
+functions/src/services/scraper/embedded.ts:291:        let products: any[] = [];
+functions/src/services/scraper/embedded.ts:295:            const jsonLdScripts: any[] = [];
+functions/src/services/scraper/headless.ts:28:    body: any;
+functions/src/services/scraper/headless.ts:56:    jsonData: any[];
+functions/src/services/scraper/headless.ts:67:function findProductArrays(obj: any, depth = 0): any[] {
+functions/src/services/scraper/headless.ts:71:    const results: any[] = [];
+functions/src/services/scraper/headless.ts:172:        const allProducts: any[] = [];
+functions/src/services/tools/info.tools.ts:14:    [key: string]: any;
+functions/src/services/tools/communication.tools.ts:18:  [key: string]: any;
+functions/src/services/tools/search.tools.ts:36:      return result.hits.map((hit: any) => ({
+functions/src/services/tools/search.tools.ts:76:      return places.map((place: any) => ({
+functions/src/services/tools/search.tools.ts:116:      return result.hits.map((hit: any) => ({
+functions/src/services/tools/search.tools.ts:135:  searchHousingListings: async (args: any, ctx: any): Promise<any> => {
+functions/src/services/tools/search.tools.ts:155:  searchPlaces: async (args: any, ctx: any): Promise<any> => {
+functions/src/services/tools/food.tools.ts:37:    [key: string]: any;
+functions/src/services/tools/food.tools.ts:162:            let restaurant: any | null = null;
+functions/src/services/tools/requests.tools.ts:9:  createServiceRequest: async (args: any, ctx: any): Promise<any> => {
+functions/src/services/tools/requests.tools.ts:60:  createOrder: async (args: any, ctx: any): Promise<any> => {
+functions/src/services/tools/misc.tools.ts:17:  [key: string]: any;
+functions/src/services/tools/misc.tools.ts:137:    args: any,
+functions/src/services/tools/misc.tools.ts:138:    userIdOrContext?: any,
+functions/src/services/tools/misc.tools.ts:248:    args: any,
+functions/src/services/tools/misc.tools.ts:249:    userIdOrContext?: any,
+functions/src/services/tools/misc.tools.ts:303:    args: any,
+functions/src/services/tools/misc.tools.ts:304:    userIdOrContext?: any,
+functions/src/services/tools/misc.tools.ts:335:  computeDistance: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/misc.tools.ts:363:  fetchHotspots: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/misc.tools.ts:396:  getAreaInfo: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/booking.tools.ts:26:  [key: string]: any;
+functions/src/services/tools/booking.tools.ts:42:    userIdOrContext: any,
+functions/src/services/tools/booking.tools.ts:114:    userIdOrContext: any,
+functions/src/services/tools/booking.tools.ts:197:    userIdOrContext: any,
+functions/src/services/tools/booking.tools.ts:243:    args: any,
+functions/src/services/tools/booking.tools.ts:244:    userIdOrContext: any,
+functions/src/services/tools/business.tools.ts:11:    [key: string]: any;
+functions/src/services/tools/business.tools.ts:15:    updateBusinessInfo: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/business.tools.ts:32:    updateBusinessAvailability: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/business.tools.ts:47:    updateBusinessHours: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/business.tools.ts:62:    uploadBusinessMedia: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/business.tools.ts:78:    listBusinessLeads: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/business.tools.ts:90:    respondToLead: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/taxi.tools.ts:16:  [key: string]: any;
+functions/src/services/tools/taxi.tools.ts:25:    userIdOrContext?: any,
+functions/src/services/tools/taxi.tools.ts:80:      const requestData: any = {
+functions/src/services/tools/taxi.tools.ts:160:    userIdOrContext?: any,
+functions/src/services/tools/itinerary.tools.ts:11:    [key: string]: any;
+functions/src/services/tools/itinerary.tools.ts:15:    createItinerary: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/itinerary.tools.ts:29:    addToItinerary: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/itinerary.tools.ts:42:    removeFromItinerary: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/itinerary.tools.ts:55:    getItinerary: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/itinerary.tools.ts:68:    saveItinerary: async (_args: any, _userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:12:  [key: string]: any;
+functions/src/services/tools/social.tools.ts:18:  createTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:40:  joinTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:58:  leaveTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:76:  postToTribe: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:106:  listTribeMessages: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:121:  getTribeInfo: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:130:  listTrendingTribes: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:149:  waveUser: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:170:  acceptWave: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:188:  listNearbyUsers: async (_args: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:197:      const users: any[] = [];
+functions/src/services/tools/social.tools.ts:217:    args: any,
+functions/src/services/tools/social.tools.ts:218:    userIdOrContext: any,
+functions/src/services/tools/social.tools.ts:241:  getCheckInsForPlace: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/social.tools.ts:255:  fetchVibeMapData: async (args: any): Promise<ToolResult> => {
+functions/src/services/tools/user.tools.ts:11:    [key: string]: any;
+functions/src/services/tools/user.tools.ts:18:    getUserProfile: async (_args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/user.tools.ts:54:    updateUserProfile: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/user.tools.ts:87:    saveFavoriteItem: async (args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/user.tools.ts:118:    listFavorites: async (_args: any, userIdOrContext: any): Promise<ToolResult> => {
+functions/src/services/tools/service.tools.ts:34:    [key: string]: any;
+functions/src/services/domains/tenant/user.service.ts:11:    const userData: any = userSnap.data() || {};
+functions/src/services/domains/tenant/user.service.ts:22:    const data: any = snap.exists ? (snap.data() || {}) : { attributes: {}, segments: [], missingData: [] };
+functions/src/services/domains/tenant/user.service.ts:25:        .filter(([_, val]: any) => val && val.confidence > 0.6)
+functions/src/services/domains/tenant/user.service.ts:26:        .map(([key, val]: any) => `${key}: ${val.value}`);
+functions/src/services/domains/knowledge/knowledge.service.ts:245:    createdAt: any;
+functions/src/services/domains/knowledge/knowledge.service.ts:252:    const toMillis = (value: any): number => {
+functions/src/services/domains/onboarding/onboarding.test.ts:20:        const docs: any[] = [];
+functions/src/services/domains/onboarding/onboarding.test.ts:51:                        set: jest.fn().mockImplementation((data: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:54:                        update: jest.fn().mockImplementation((data: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:77:            runTransaction: jest.fn((callback: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:79:                    get: jest.fn().mockImplementation((ref: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:88:                    set: jest.fn().mockImplementation((ref: any, data: any, opts: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:96:                    update: jest.fn().mockImplementation((ref: any, data: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:109:                    set: jest.fn((ref: any, data: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:112:                    update: jest.fn((ref: any, data: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:119:                    delete: jest.fn((ref: any) => {
+functions/src/services/domains/onboarding/onboarding.test.ts:147:    let firestore: any;
+functions/src/services/domains/onboarding/onboarding.test.ts:159:    const createThread = (onboardingState?: any): Thread => ({
+functions/src/services/domains/channels/whatsappInbound.repository.test.ts:21:                    set: jest.fn().mockImplementation(async (data: any) => {
+functions/src/services/domains/channels/whatsappInbound.repository.test.ts:24:                    update: jest.fn().mockImplementation(async (patch: any) => {
+functions/src/services/domains/channels/whatsappInbound.repository.test.ts:36:                    get: jest.fn().mockImplementation(async (ref: any) => {
+functions/src/services/domains/channels/whatsappInbound.repository.test.ts:43:                    set: jest.fn().mockImplementation((ref: any, data: any) => {
+functions/src/services/domains/channels/whatsappInbound.repository.test.ts:47:                    update: jest.fn().mockImplementation((ref: any, patch: any) => {
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:327:  booking: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:355:  booking: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:380:  booking: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:414:  order: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:439:  order: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:464:  order: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:498:  request: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:523:  request: any,
+functions/src/services/domains/whatsapp-ops/vendorReply.service.ts:548:  request: any,
+functions/src/services/notification/channels/whatsapp.channel.ts:37:            .map((i: any) => `${i.quantity}x ${i.name}`)
+functions/src/services/agent/memory.service.ts:6:    updateLongTermMemory: async (userId: string, recentMessages: any[]) => {
+functions/src/services/agent/memory.service.ts:92:        const clean = (obj: any) => Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null));
+functions/src/services/integrations/maps/mapbox.gateway.ts:22:    [key: string]: any;
+functions/src/services/integrations/maps/mapbox.gateway.ts:24:  context?: any[];
+functions/src/services/integrations/maps/mapbox.gateway.ts:65:    return response.data.features.map((f: any) => ({
+functions/src/services/integrations/maps/osm.gateway.ts:63:            return response.data.elements.map((el: any) => {
+functions/src/services/integrations/maps/osm.gateway.ts:84:            }).filter((p: any) => p !== null && p.name !== 'Unnamed Place');
+functions/src/services/integrations/maps/osm.gateway.ts:111:            return response.data.map((item: any) => ({
+functions/src/services/integrations/typesense/typesense.gateway.ts:19:const listingsSchema: any = {
+functions/src/services/integrations/typesense/typesense.gateway.ts:61:const usersSchema: any = {
+functions/src/services/integrations/typesense/typesense.gateway.ts:115:export async function upsertListing(listing: any) {
+functions/src/services/integrations/typesense/typesense.gateway.ts:117:        const document: any = {
+functions/src/services/integrations/typesense/typesense.gateway.ts:216:export async function upsertUserIntelligence(uid: string, intel: any) {
+functions/src/services/integrations/typesense/typesense.gateway.ts:300:                logger.warn(`[Typesense] Sample docs in index`, sample.hits?.map((h: any) => h.document));
+functions/src/services/integrations/typesense/typesense.gateway.ts:310:                    hits: retry.hits?.map((hit: any) => hit.document) || [],
+functions/src/services/integrations/typesense/typesense.gateway.ts:320:            hits: results.hits?.map((hit: any) => hit.document) || [],
+functions/src/services/channels/whatsapp/whatsapp.router.test.ts:21:function mockCollectionQuery(results: { id: string; data: any }[]) {
+functions/src/services/channels/whatsapp/whatsapp.adapter.ts:17:export function normalizeTwilioWhatsAppPayload(payload: any): NormalizedInboundWhatsAppMessage {

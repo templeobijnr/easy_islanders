@@ -4,6 +4,7 @@ import { User, Mail, Phone, MapPin, Camera, Hash, Award, Trophy, Check, Edit3, A
 import { useAuth } from '../../context/AuthContext';
 import { UserProfile, PassportStamp } from '../../types';
 import { PASSPORT_LOCATIONS } from '../../components/constants';
+import { formatDate } from '../../utils/formatters';
 
 const INTERESTS = ['Hiking', 'Tech', 'Crypto', 'Dining', 'Nightlife', 'Sailing', 'Tennis', 'Gaming', 'Photography', 'Nature', 'History'];
 
@@ -267,7 +268,9 @@ const ProfileView: React.FC = () => {
                         <div key={stamp.id} className="aspect-square bg-amber-50 rounded-full border-4 border-double border-amber-200 flex flex-col items-center justify-center p-4 transform hover:rotate-6 transition-transform cursor-pointer shadow-sm relative group">
                            <span className="text-4xl mb-1">{stamp.icon}</span>
                            <span className="text-xs font-bold text-amber-900 text-center leading-tight">{stamp.locationName}</span>
-                           <span className="text-[9px] text-amber-700 mt-1 font-mono">{new Date(stamp.date).toLocaleDateString()}</span>
+                           <span className="text-[9px] text-amber-700 mt-1 font-mono">
+                              {formatDate(stamp.date, { year: 'numeric', month: 'short', day: 'numeric' })}
+                           </span>
                            
                            {/* Ink effect overlay */}
                            <div className="absolute inset-0 rounded-full border-[6px] border-amber-900/10 pointer-events-none"></div>

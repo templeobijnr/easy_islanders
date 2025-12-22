@@ -15,7 +15,7 @@ export const TRANSLATIONS = {
     help: "Help Center",
     logout: "Log out",
     my_account: "My Account",
-    
+
     // Auth
     welcome_back: "Welcome back",
     create_account: "Create your account",
@@ -35,22 +35,33 @@ export const TRANSLATIONS = {
     creating_account: "Creating account...",
 
     // Hero
-    hero_tag: "Discover North Cyprus",
-    hero_title: "🌴 Island Life,",
-    hero_experts: "Made Easy.",
-    hero_subtitle: "Discover North Cyprus with an intelligent companion. Explore apartments, rent cars, find services, buy electronics, and book events—all through one simple chat.",
-    hero_cta_agent: "Choose Your Agent",
-    hero_cta_explore: "Explore Marketplace",
-    live: "LIVE",
+    hero_tag: "North Cyprus, Simplified",
+    hero_title: "Discover the Best of",
+    hero_experts: "North Cyprus—Effortlessly.",
+    hero_subtitle: "Find things to do, book what you want, and explore the island with confidence—instantly.",
+    hero_cta_agent: "Chat With Your Island Assistant",
+    hero_cta_explore: "Explore Stays & Activities",
+    hero_cta_agent_sub: "Ask anything—from villas to spas to car rentals.",
+    hero_cta_explore_sub: "Discover top places to stay and things to do.",
+    live: "ONLINE",
+
+    // Value Props (Section 2)
+    value_title: "What Your Island Assistant Can Do",
+    value_1_title: "Find Places",
+    value_1_desc: "Get tailored recommendations for the best stays, restaurants, spas, and activities.",
+    value_2_title: "Compare Options",
+    value_2_desc: "See prices, availability, and details—without browsing dozens of tabs.",
+    value_3_title: "Book Anything",
+    value_3_desc: "Reserve stays, activities, rentals, and more directly through chat.",
 
     // Agent
-    agent_welcome: "Hi, I am {name}. How can I assist you with your property needs today? What language do you speak?",
+    agent_welcome: "Hi, I am {name}. I'm your personal island assistant. I can help you find places, compare options, and book anything through simple chat. How can I help you today?",
     agent_placeholder: "Ask {name} anything...",
     agent_thinking: "thinking...",
     agent_select: "Select Your Expert",
     agent_mode: "Current Mode",
     location_share: "Share Location",
-    
+
     // Explore / Filters
     filters: "Filters",
     advanced_search: "Advanced Search",
@@ -58,7 +69,7 @@ export const TRANSLATIONS = {
     no_items: "No items found",
     try_adjusting: "Try adjusting your filters or switching categories.",
     clear_filters: "Clear all filters",
-    
+
     // Domains
     real_estate: "Real Estate",
     hotels: "Hotels",
@@ -73,7 +84,7 @@ export const TRANSLATIONS = {
     bedrooms: "Bedrooms",
     price_range: "Price Range",
     max_price: "Max Price / Budget",
-    
+
     // Connect
     connect_title: "Islanders Connect",
     connect_subtitle: "Meet locals, join tribes, and experience the island together.",
@@ -88,7 +99,7 @@ export const TRANSLATIONS = {
     review_btn: "Review",
     join_group: "Join Group",
     im_in: "I'm In!",
-    
+
     // Footer
     footer_desc: "Redefining the marketplace with agent-led discovery. Your personal concierge for the world's most exclusive islands.",
     company: "Company",

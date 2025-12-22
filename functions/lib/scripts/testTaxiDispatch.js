@@ -10,7 +10,7 @@
  * npx ts-node -r esbuild-register src/scripts/testTaxiDispatch.ts
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const toolService_1 = require("../services/toolService");
+const tool_service_1 = require("../services/agent/tool.service");
 async function testTaxiDispatch() {
     var _a, _b, _c, _d, _e, _f;
     console.log('🚕 ═══════════════════════════════════════════════════');
@@ -19,7 +19,7 @@ async function testTaxiDispatch() {
     // Test 1: Kyrenia Marina Pickup (Should select Kyrenia Premium Taxi)
     console.log('📍 Test 1: Kyrenia Marina to Bellapais\n');
     try {
-        const result = await toolService_1.toolResolvers.dispatchTaxi({
+        const result = await tool_service_1.toolResolvers.dispatchTaxi({
             pickupLocation: 'Kyrenia Marina',
             destination: 'Bellapais Abbey',
             pickupLat: 35.3369,
@@ -55,7 +55,7 @@ async function testTaxiDispatch() {
     // Test 2: Generic request (Should select any available taxi)
     console.log('📍 Test 2: Generic Taxi Request (Airport)\n');
     try {
-        const result2 = await toolService_1.toolResolvers.dispatchTaxi({
+        const result2 = await tool_service_1.toolResolvers.dispatchTaxi({
             pickupLocation: 'Ercan Airport',
             destination: 'Kyrenia Center',
             customerContact: 'whatsapp:+905488639394',

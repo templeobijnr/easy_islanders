@@ -5,9 +5,15 @@ import * as typesenseService from "../services/typesense.service";
 export const onListingWrite = onDocumentWritten(
     {
         document: "listings/{listingId}",
+        database: "easy-db",
         region: "europe-west1"
     },
     async (event) => {
+        if (!process.env.TYPESENSE_API_KEY) {
+            logger.info(`[onListingWrite] TYPESENSE_API_KEY not set; skipping index sync`);
+            return;
+        }
+
         const listingId = event.params.listingId;
         const newDoc = event.data?.after.data();
 

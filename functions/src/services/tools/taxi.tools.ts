@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errors';
 /**
  * Taxi & Transportation Tools
  *
@@ -7,12 +8,40 @@
 import * as logger from "firebase-functions/logger";
 import type { RequestTaxiArgs, DispatchTaxiArgs } from "../../types/tools";
 import { db } from "../../config/firebase";
-import { asToolContext } from "./toolContext";
+import { asToolContext, UserIdOrToolContext } from "./toolContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TaxiRequestData {
+  userId: string;
+  customerName: string;
+  customerPhone: string;
+  pickup: {
+    address: string;
+    location: {
+      lat: number;
+      lng: number;
+      district: string;
+    };
+  };
+  dropoff: {
+    address: string;
+  };
+  priceEstimate?: number;
+}
+
+interface UserData {
+  phone?: string;
+  email?: string;
+  displayName?: string;
+}
 
 interface ToolResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const taxiTools = {
@@ -21,7 +50,7 @@ export const taxiTools = {
    */
   requestTaxi: async (
     args: RequestTaxiArgs,
-    userIdOrContext?: any,
+    userIdOrContext?: UserIdOrToolContext,
     sessionId?: string,
   ): Promise<ToolResult> => {
     logger.debug("🚕 [RequestTaxi] New System:", args);
@@ -29,8 +58,12 @@ export const taxiTools = {
     try {
       const ctx = asToolContext(userIdOrContext, sessionId);
       const userId = ctx.userId;
-      const { createAndBroadcastRequest } = await import("../taxi.service");
-      const { reverseGeocode } = await import("../../utils/reverseGeocode");
+      // NOTE: Use `require()` instead of dynamic `import()` so Jest can mock these modules
+      // and unit tests don't require Node VM module flags.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { createAndBroadcastRequest } = require("../taxi.service");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { reverseGeocode } = require("../../utils/reverseGeocode");
 
       // Get user profile for contact info if not provided
       let customerPhone = args.customerPhone || "";
@@ -39,10 +72,10 @@ export const taxiTools = {
       if (userId && !customerPhone) {
         const userSnap = await db.collection("users").doc(userId).get();
         if (userSnap.exists) {
-          const userData = userSnap.data();
+          const userData = userSnap.data() as UserData | undefined;
           customerPhone =
-            (userData as any)?.phone || (userData as any)?.email || "";
-          customerName = (userData as any)?.displayName || customerName;
+            userData?.phone || userData?.email || "";
+          customerName = userData?.displayName || customerName;
         }
       }
 
@@ -76,7 +109,7 @@ export const taxiTools = {
 
       // Create and broadcast the request
       // Note: Firestore doesn't accept undefined values, so we conditionally include priceEstimate
-      const requestData: any = {
+      const requestData: TaxiRequestData = {
         userId: userId || "guest",
         customerName,
         customerPhone,
@@ -85,7 +118,7 @@ export const taxiTools = {
           location: {
             lat: args.pickupLat || 0,
             lng: args.pickupLng || 0,
-            district: args.pickupDistrict,
+            district: args.pickupDistrict || "Unknown",
           },
         },
         dropoff: {
@@ -114,11 +147,11 @@ export const taxiTools = {
         message:
           "Taxi request sent to available drivers. You will be notified when a driver accepts.",
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [RequestTaxi] Failed:", err);
       return {
         success: false,
-        error: err.message || "Failed to request taxi",
+        error: getErrorMessage(err) || "Failed to request taxi",
       };
     }
   },
@@ -156,7 +189,7 @@ export const taxiTools = {
    */
   dispatchTaxi: async (
     args: DispatchTaxiArgs,
-    userIdOrContext?: any,
+    userIdOrContext?: UserIdOrToolContext,
     sessionId?: string,
   ): Promise<ToolResult> => {
     logger.debug("🚖 [DispatchTaxi] Redirecting to new system...", args);

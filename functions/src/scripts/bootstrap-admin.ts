@@ -1,4 +1,5 @@
 import * as logger from "firebase-functions/logger";
+import { getErrorMessage } from '../utils/errors';
 
 /**
  * Bootstrap Admin Script
@@ -45,8 +46,9 @@ async function bootstrapAdmin(email: string) {
     try {
       user = await admin.auth().getUserByEmail(email);
       logger.debug(`✅ Found existing user: ${user.uid}`);
-    } catch (err: any) {
-      if (err.code === "auth/user-not-found") {
+    } catch (err: unknown) {
+      const code = typeof err === "object" && err && "code" in err ? (err as any).code : undefined;
+      if (code === "auth/user-not-found") {
         console.error(
           `❌ User not found. Please sign up first at the app, then run this script.`,
         );
@@ -93,8 +95,8 @@ async function bootstrapAdmin(email: string) {
       `\n⚠️  IMPORTANT: The user must SIGN OUT and SIGN BACK IN to get the new token.`,
     );
     logger.debug(`   Alternatively, call forceRefreshToken() in the app.\n`);
-  } catch (error: any) {
-    console.error(`\n❌ Error:`, error.message);
+  } catch (error: unknown) {
+    console.error(`\n❌ Error:`, getErrorMessage(error));
     process.exit(1);
   }
 

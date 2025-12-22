@@ -18,7 +18,11 @@ export const SocialStorage = {
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => doc.data() as SocialPost);
     } catch (error) {
-      console.error("Error fetching social posts:", error);
+      const err = error as any;
+      if (err?.name === 'AbortError') {
+        return [];
+      }
+      // console.warn("Error fetching social posts (masked):", error);
       return [];
     }
   },
@@ -36,20 +40,36 @@ export const SocialStorage = {
       const querySnapshot = await getDocs(collection(db, COLLECTIONS.GROUPS));
       return querySnapshot.docs.map(doc => doc.data() as SocialGroup);
     } catch (error) {
+      const err = error as any;
+      if (err?.name === 'AbortError') {
+        return [];
+      }
       console.error("Error fetching groups:", error);
       return [];
     }
   },
 
   saveSocialGroup: async (group: SocialGroup): Promise<void> => {
-      await setDoc(doc(db, COLLECTIONS.GROUPS, group.id), sanitizeData(group), { merge: true });
+    await setDoc(doc(db, COLLECTIONS.GROUPS, group.id), sanitizeData(group), { merge: true });
   },
 
   getSocialUsers: async (): Promise<SocialUser[]> => {
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-      return querySnapshot.docs.map(doc => doc.data() as SocialUser);
+      return querySnapshot.docs.map(doc => {
+        const data: any = doc.data();
+        return {
+          ...data,
+          passportStamps: Array.isArray(data.passportStamps) ? data.passportStamps : [],
+          badges: Array.isArray(data.badges) ? data.badges : [],
+          interests: Array.isArray(data.interests) ? data.interests : [],
+        } as SocialUser;
+      });
     } catch (error) {
+      const err = error as any;
+      if (err?.name === 'AbortError') {
+        return [];
+      }
       console.error("Error fetching social users:", error);
       return [];
     }
@@ -61,12 +81,16 @@ export const SocialStorage = {
       if (querySnapshot.empty) return [];
       return querySnapshot.docs.map(doc => doc.data());
     } catch (error) {
+      const err = error as any;
+      if (err?.name === 'AbortError') {
+        return [];
+      }
       console.error("Error fetching conversations:", error);
       return [];
     }
   },
 
   saveConversation: async (convo: any): Promise<void> => {
-      await setDoc(doc(db, COLLECTIONS.CONVERSATIONS, convo.id), sanitizeData(convo));
+    await setDoc(doc(db, COLLECTIONS.CONVERSATIONS, convo.id), sanitizeData(convo));
   },
 };

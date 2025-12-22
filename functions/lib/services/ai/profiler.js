@@ -2,13 +2,23 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analyzeChatTurn = analyzeChatTurn;
 const generative_ai_1 = require("@google/generative-ai");
-const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+let genAI = null;
+const getGenAI = () => {
+    if (genAI)
+        return genAI;
+    const key = process.env.GEMINI_API_KEY;
+    if (!key)
+        return null;
+    genAI = new generative_ai_1.GoogleGenerativeAI(key);
+    return genAI;
+};
 async function analyzeChatTurn(userId, lastMessage, currentGraph) {
-    if (!lastMessage || !genAI)
+    const client = getGenAI();
+    if (!lastMessage || !client)
         return currentGraph;
     console.log(`[Profiler] Analyzing message for user ${userId}:`, lastMessage);
     console.log(`[Profiler] Current graph:`, JSON.stringify(currentGraph).substring(0, 400));
-    const model = genAI.getGenerativeModel({
+    const model = client.getGenerativeModel({
         model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
         systemInstruction: `
         You are an expert profiler. Analyze the latest user message and update a user intelligence graph.

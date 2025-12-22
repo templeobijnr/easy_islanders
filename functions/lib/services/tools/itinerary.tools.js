@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.itineraryTools = void 0;
 const firebase_1 = require("../../config/firebase");
 const firestore_1 = require("firebase-admin/firestore");
+const toolContext_1 = require("./toolContext");
 const now = firestore_1.FieldValue.serverTimestamp;
 exports.itineraryTools = {
-    createItinerary: async (args, userId) => {
+    createItinerary: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -18,7 +20,8 @@ exports.itineraryTools = {
             return { success: false, error: err.message };
         }
     },
-    addToItinerary: async (args, userId) => {
+    addToItinerary: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -30,7 +33,8 @@ exports.itineraryTools = {
             return { success: false, error: err.message };
         }
     },
-    removeFromItinerary: async (args, userId) => {
+    removeFromItinerary: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -42,7 +46,8 @@ exports.itineraryTools = {
             return { success: false, error: err.message };
         }
     },
-    getItinerary: async (args, userId) => {
+    getItinerary: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -54,7 +59,7 @@ exports.itineraryTools = {
             return { success: false, error: err.message };
         }
     },
-    saveItinerary: async (_args, _userId) => {
+    saveItinerary: async (_args, _userIdOrContext) => {
         return { success: true };
     }
 };

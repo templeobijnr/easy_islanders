@@ -5,24 +5,66 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev:web": "turbo run dev --filter=easy-islanders",
+    "dev:mobile": "turbo run dev --filter=mobile",
+    "dev:emulators": "cd functions && npm run serve",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "check:cycles": "madge --circular --extensions ts,tsx src",
+    "preview": "vite preview",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "prepare": "husky",
+    "guard:services": "npx tsx scripts/guard-services-structure.ts",
+    "audit:frontend": "npx tsx scripts/audit-frontend.ts"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@supabase/supabase-js": "2.39.0",
     "@types/mapbox-gl": "^3.4.1",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.554.0",
     "mapbox-gl": "^3.16.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-day-picker": "^9.11.3",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.14.0",
+    "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/ui": "^4.0.14",
+    "eslint": "^9.39.2",
     "firebase": "^12.6.0",
     "firebase-tools": "^14.26.0",
+    "happy-dom": "^20.0.11",
+    "husky": "^9.1.7",
+    "jsdom": "^27.3.0",
+    "lint-staged": "^16.2.7",
+    "madge": "^8.0.0",
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20",
+    "prettier": "^3.7.4",
+    "terser": "^5.44.1",
+    "turbo": "^2.3.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+    "vite": "^6.2.0",
+    "vitest": "^4.0.15"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "packageManager": "pnpm@8.15.9+sha512.499434c9d8fdd1a2794ebf4552b3b25c0a633abcee5bb15e7b5de90f32f47b513aca98cd5cfd001c31f0db454bc3804edccd578501e4ca293a6816166bbd9f81"
 }

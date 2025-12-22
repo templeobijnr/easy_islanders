@@ -42,13 +42,24 @@ exports.bookingTools = void 0;
 const firestore_1 = require("firebase-admin/firestore");
 const listing_repository_1 = require("../../repositories/listing.repository");
 const firebase_1 = require("../../config/firebase");
+const booking_ledger_tools_1 = require("./booking-ledger.tools");
+const toolContext_1 = require("./toolContext");
 const now = firestore_1.FieldValue.serverTimestamp;
+function mapToLedgerChannel(channel) {
+    if (channel === 'whatsapp')
+        return 'whatsapp';
+    if (channel === 'discover')
+        return 'discover_chat';
+    return 'app_chat';
+}
 exports.bookingTools = {
     /**
      * Create a booking for a listing (short-term stay, car rental, etc.)
      * Persists a booking document and returns a receipt payload.
      */
-    createBooking: async (args, userId) => {
+    createBooking: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -103,7 +114,9 @@ exports.bookingTools = {
     /**
      * Schedule a property viewing with the owner/agent
      */
-    scheduleViewing: async (args, userId) => {
+    scheduleViewing: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -171,7 +184,9 @@ exports.bookingTools = {
     /**
      * Create a payment intent for a booking
      */
-    createPaymentIntent: async (args, userId) => {
+    createPaymentIntent: async (args, userIdOrContext) => {
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
         if (!userId) {
             return {
                 success: false,
@@ -200,6 +215,64 @@ exports.bookingTools = {
                 error: err.message || 'Failed to create payment intent'
             };
         }
-    }
+    },
+    /**
+     * Initiate a booking using the execution ledger (draft → hold).
+     * Returns a pendingAction that must be confirmed via YES/NO gate.
+     *
+     * This is the channel-agnostic equivalent of the controller-specific booking flow.
+     */
+    initiateBooking: async (args, userIdOrContext) => {
+        var _a, _b;
+        const ctx = (0, toolContext_1.asToolContext)(userIdOrContext);
+        const userId = ctx.userId;
+        if (!userId) {
+            return { success: false, error: 'Unauthorized: User ID required' };
+        }
+        const itemId = (args === null || args === void 0 ? void 0 : args.itemId) || (args === null || args === void 0 ? void 0 : args.listingId) || (args === null || args === void 0 ? void 0 : args.offeringId);
+        if (!itemId) {
+            return { success: false, error: 'itemId is required' };
+        }
+        const businessResult = await (0, booking_ledger_tools_1.resolveBusinessId)(itemId);
+        if (!businessResult.success) {
+            return { success: false, error: businessResult.error, errorCode: businessResult.errorCode };
+        }
+        const today = new Date().toISOString().split('T')[0];
+        const date = (args === null || args === void 0 ? void 0 : args.date) || (args === null || args === void 0 ? void 0 : args.checkInDate) || today;
+        const time = (args === null || args === void 0 ? void 0 : args.time) || '12:00';
+        const partySize = (args === null || args === void 0 ? void 0 : args.guests) || (args === null || args === void 0 ? void 0 : args.partySize) || 1;
+        const holdResult = await (0, booking_ledger_tools_1.createHeldBooking)({
+            businessId: businessResult.businessId,
+            offeringId: itemId,
+            offeringName: (args === null || args === void 0 ? void 0 : args.itemTitle) || (args === null || args === void 0 ? void 0 : args.offeringName) || 'Booking',
+            channel: mapToLedgerChannel(ctx.channel),
+            actor: {
+                userId,
+                name: args === null || args === void 0 ? void 0 : args.customerName,
+                phoneE164: (_a = ctx === null || ctx === void 0 ? void 0 : ctx.actor) === null || _a === void 0 ? void 0 : _a.phoneE164,
+            },
+            date,
+            time,
+            partySize,
+            notes: (args === null || args === void 0 ? void 0 : args.specialRequests) || (args === null || args === void 0 ? void 0 : args.notes),
+            idempotencyKey: `booking:${ctx.sessionId || 'no-session'}:${itemId}:${date}:${time}`,
+        });
+        if (!holdResult.success) {
+            return {
+                success: false,
+                error: holdResult.error,
+                errorCode: holdResult.errorCode,
+                unavailable: holdResult.errorCode === 'RESOURCE_UNAVAILABLE',
+            };
+        }
+        return {
+            success: true,
+            awaitingConfirmation: true,
+            transactionId: holdResult.txId,
+            holdExpiresAt: (_b = holdResult.holdExpiresAt) === null || _b === void 0 ? void 0 : _b.toISOString(),
+            confirmationPrompt: holdResult.confirmationPrompt,
+            pendingAction: holdResult.pendingAction,
+        };
+    },
 };
 //# sourceMappingURL=booking.tools.js.map

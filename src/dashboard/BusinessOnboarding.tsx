@@ -239,7 +239,7 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
       setVerificationId(id);
       setOtpCode("");
       setStep("verify");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Claim failed:", error);
       setClaimError(
         error?.message || "Failed to start claim. Please try again.",
@@ -296,7 +296,7 @@ const BusinessOnboarding: React.FC<BusinessOnboardingProps> = ({
 
       setStep("success");
       setTimeout(() => onComplete(config), 1200);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("OTP confirm failed:", error);
       setClaimError(error?.message || "Verification failed. Please try again.");
     } finally {

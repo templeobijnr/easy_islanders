@@ -1,5 +1,6 @@
 import * as logger from "firebase-functions/logger";
 import { db } from "../../config/firebase";
+import { getErrorMessage } from '../../utils/errors';
 
 import type {
   CreateConsumerRequestArgs,
@@ -7,13 +8,57 @@ import type {
 } from "../../types/tools";
 import { placesRepository } from "../../repositories/places.repository";
 import { searchMapboxPlaces } from "../mapbox.service";
-import { asToolContext } from "./toolContext";
+import { UserIdOrToolContext, asToolContext, ToolContext } from "./toolContext";
 import type { PlaceCategory } from "../../types/v1";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface GetNearbyPlacesArgs {
+  location?: string;
+  domain?: string;
+  radiusKm?: number;
+  limit?: number;
+}
+
+interface OrderHouseholdSuppliesArgs {
+  contactPhone?: string;
+  customerName?: string;
+  items?: string[];
+  deliveryAddress?: string;
+}
+
+interface RequestServiceArgs {
+  serviceType?: string;
+  description?: string;
+  urgency?: 'low' | 'medium' | 'high';
+}
+
+interface ComputeDistanceArgs {
+  from: string;
+  to: string;
+}
+
+interface FetchHotspotsArgs {
+  area?: string;
+  limit?: number;
+}
+
+interface AreaInfoArgs {
+  area: string;
+}
+
+interface UserData {
+  phone?: string;
+  email?: string;
+  displayName?: string;
+}
 
 interface ToolResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 function parseLatLng(
@@ -133,8 +178,8 @@ export const miscTools = {
    * then filter the curated Firestore `places` collection by distance.
    */
   getNearbyPlaces: async (
-    args: any,
-    userIdOrContext?: any,
+    args: GetNearbyPlacesArgs,
+    userIdOrContext?: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const ctx = asToolContext(userIdOrContext);
 
@@ -146,9 +191,9 @@ export const miscTools = {
     const currentLoc =
       ctx.location && typeof ctx.location === "object"
         ? {
-            lat: (ctx.location as any).lat as number,
-            lng: (ctx.location as any).lng as number,
-          }
+          lat: (ctx.location as { lat: number; lng: number }).lat,
+          lng: (ctx.location as { lat: number; lng: number }).lng,
+        }
         : null;
 
     let origin: { lat: number; lng: number } | null =
@@ -172,7 +217,9 @@ export const miscTools = {
     }
 
     const category = normalizePlaceCategory(domain);
-    let places = await placesRepository.getByCityId("north-cyprus", true);
+    // Use marketId from context for multi-market support
+    const marketId = ctx.marketId;
+    let places = await placesRepository.getByCityId(marketId, true);
     if (category) {
       places = places.filter((p) => p.category === category);
     }
@@ -242,27 +289,29 @@ export const miscTools = {
 
   /**
    * Household supplies / groceries order
+   * 
+   * Pattern: Collect → Validate → Persist → Dispatch via WhatsApp
    */
   orderHouseholdSupplies: async (
-    args: any,
-    userIdOrContext?: any,
+    args: OrderHouseholdSuppliesArgs,
+    userIdOrContext?: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     logger.debug("🛒 [OrderSupplies] New order:", args);
 
     try {
       const ctx = asToolContext(userIdOrContext);
       const userId = ctx.userId;
-      // Get user profile for contact info if not provided
+
+      // 1. Resolve customer info
       let customerPhone = args.contactPhone || "";
       let customerName = args.customerName || "Guest";
 
       if (userId && !customerPhone) {
         const userSnap = await db.collection("users").doc(userId).get();
         if (userSnap.exists) {
-          const userData = userSnap.data();
-          customerPhone =
-            (userData as any)?.phone || (userData as any)?.email || "";
-          customerName = (userData as any)?.displayName || customerName;
+          const userData = userSnap.data() as UserData | undefined;
+          customerPhone = userData?.phone || "";
+          customerName = userData?.displayName || customerName;
         }
       }
 
@@ -270,27 +319,109 @@ export const miscTools = {
         return { success: false, error: "Customer phone number is required" };
       }
 
+      const deliveryAddress = args.deliveryAddress || "Address not specified";
+      const items = Array.isArray(args.items) ? args.items.join(", ") : (args.items || "Items not specified");
+
+      // 2. Find a vendor listing with order_supplies action enabled
+      const vendorListings = await db.collection("listings")
+        .where("merve.enabled", "==", true)
+        .limit(20)
+        .get();
+
+      let vendorPhone: string | null = null;
+      let vendorName = "Vendor";
+      let vendorId: string | null = null;
+
+      for (const doc of vendorListings.docs) {
+        const listing = doc.data();
+        const actions = listing.merve?.actions || [];
+        const suppliesAction = actions.find(
+          (a: { actionType: string; enabled: boolean }) =>
+            a.actionType === "order_supplies" && a.enabled
+        );
+
+        if (suppliesAction) {
+          vendorPhone = suppliesAction.dispatch?.toE164 || listing.merve?.whatsappE164 || null;
+          vendorName = listing.title || listing.name || "Vendor";
+          vendorId = doc.id;
+          break;
+        }
+      }
+
+      // 3. Persist order to Firestore
       const orderId = `GRO-${Date.now()}`;
-      // For now, just logging and returning success as per original stub logic for some parts,
-      // but let's try to keep the logic if it was there.
-      // The original had complex logic to find markets. I'll simplify for this extraction
-      // to match the "misc" nature, but ideally this should be in a `commerce.tools.ts` later.
+      const orderData = {
+        id: orderId,
+        type: "household_supplies",
+        items,
+        deliveryAddress,
+        customerName,
+        customerPhone: customerPhone.replace("whatsapp:", ""),
+        customerContact: customerPhone.replace("whatsapp:", ""),
+        userId: userId || null,
+        vendorListingId: vendorId,
+        vendorPhone,
+        status: vendorPhone ? "dispatched" : "pending",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-      // ... (Simplified for now to match the index.ts stub, but I should probably copy the full logic if I want to be faithful)
-      // Let's use the full logic from ORIGINAL if possible, but it requires imports like process.env which might be tricky.
-      // For now, I'll stick to the logic that was in the index.ts stub or a simplified version
-      // to ensure it compiles, as the full logic had deep dependencies.
+      await db.collection("groceryOrders").doc(orderId).set(orderData);
+      logger.debug(`✅ [OrderSupplies] Persisted order ${orderId}`);
 
+      // 4. Dispatch via WhatsApp if vendor found
+      if (vendorPhone) {
+        const message =
+          `🛒 *New Order from Easy Islanders*\n\n` +
+          `📦 Items: ${items}\n` +
+          `📍 Deliver to: ${deliveryAddress}\n` +
+          `👤 Customer: ${customerName}\n` +
+          `📞 Phone: ${customerPhone.replace("whatsapp:", "")}\n\n` +
+          `Reply YES to confirm or NO to decline.`;
+
+        try {
+          const { sendWhatsApp } = await import("../twilio.service");
+          const result = await sendWhatsApp(vendorPhone, message);
+
+          await db.collection("groceryOrders").doc(orderId).update({
+            dispatchMessageSid: result.sid,
+            dispatchedAt: new Date().toISOString(),
+          });
+
+          logger.debug(`✅ [OrderSupplies] Dispatched to ${vendorName} (${vendorPhone})`);
+
+          return {
+            success: true,
+            orderId,
+            vendorName,
+            status: "dispatched",
+            message: `Order sent to ${vendorName}! They will contact you shortly.`,
+          };
+        } catch (whatsappErr: unknown) {
+          logger.error("⚠️ [OrderSupplies] WhatsApp dispatch failed:", whatsappErr);
+          // Order is still saved, just not dispatched
+          return {
+            success: true,
+            orderId,
+            status: "pending",
+            message: "Order received. We're arranging delivery and will contact you shortly.",
+            warning: "Automatic dispatch failed - manual follow-up required",
+          };
+        }
+      }
+
+      // 5. No vendor found - order saved for manual processing
       return {
         success: true,
         orderId,
-        message: "Order received (stub)",
+        status: "pending",
+        message: "Order received. We're arranging delivery and will contact you shortly.",
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [OrderSupplies] Failed:", err);
       return {
         success: false,
-        error: err.message || "Failed to process order",
+        error: getErrorMessage(err) || "Failed to process order",
       };
     }
   },
@@ -299,8 +430,8 @@ export const miscTools = {
    * Service / handyman request
    */
   requestService: async (
-    args: any,
-    userIdOrContext?: any,
+    args: RequestServiceArgs,
+    userIdOrContext?: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const ctx = asToolContext(userIdOrContext);
     logger.debug("🔧 [RequestService] New request:", args);
@@ -331,7 +462,7 @@ export const miscTools = {
   /**
    * Compute distance between two points
    */
-  computeDistance: async (args: any): Promise<ToolResult> => {
+  computeDistance: async (args: ComputeDistanceArgs): Promise<ToolResult> => {
     const parse = (str: string) => {
       const parts = (str || "")
         .split(",")
@@ -359,7 +490,7 @@ export const miscTools = {
   /**
    * Fetch hotspots
    */
-  fetchHotspots: async (args: any): Promise<ToolResult> => {
+  fetchHotspots: async (args: FetchHotspotsArgs): Promise<ToolResult> => {
     logger.debug("Fetch hotspots", args);
     try {
       const snap = await db
@@ -384,15 +515,15 @@ export const miscTools = {
         .slice(0, 10)
         .map(([place, score]) => ({ place, score }));
       return { success: true, hotspots };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
     }
   },
 
   /**
    * Get area info
    */
-  getAreaInfo: async (args: any): Promise<ToolResult> => {
+  getAreaInfo: async (args: AreaInfoArgs): Promise<ToolResult> => {
     const vibe = await miscTools.fetchHotspots({ area: args.area });
     return { success: true, area: args.area, hotspots: vibe.hotspots || [] };
   },

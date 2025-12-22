@@ -27,9 +27,9 @@ import {
   Camera,
 } from "lucide-react";
 import { Stay } from "../../types/connect";
-import { BookingsService } from "../../services/bookingsService";
+import { BookingsService } from "../../services/domains/bookings/bookings.service";
 import { useAuth } from "../../context/AuthContext";
-import MapMini from "../../components/admin/Shared/MapMini";
+import MapMini from "../../components/shared/MapMini";
 import { BusinessChatButton } from "../../components/business/BusinessChatWidget";
 
 interface StayBookingModuleProps {
@@ -304,7 +304,7 @@ const StayBookingModule: React.FC<StayBookingModuleProps> = ({
                   </h3>
 
                   {Array.isArray(stay.amenities) &&
-                  stay.amenities.length > 0 ? (
+                    stay.amenities.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mb-4">
                       {stay.amenities.map((am, i) => (
                         <span
@@ -352,7 +352,7 @@ const StayBookingModule: React.FC<StayBookingModuleProps> = ({
                         <MapMini
                           lat={stay.coordinates.lat}
                           lng={stay.coordinates.lng}
-                          onChange={() => {}}
+                          onChange={() => { }}
                         />
                       </div>
                       {stay.address && (

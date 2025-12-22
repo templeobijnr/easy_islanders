@@ -2,15 +2,15 @@ import * as logger from "firebase-functions/logger";
 import { Router } from "express";
 import { handleChatMessage } from "../controllers/chat.controller";
 import { searchListings } from "../controllers/search.controller";
-import { createPaymentIntent } from "../controllers/payment.controller";
 import {
-  importListingFromUrl,
   createListing,
-  updateListing,
   deleteListing,
-  getUserListings,
   getListingById,
+  getUserListings,
+  importListingFromUrl,
+  updateListing,
 } from "../controllers/listing.controller";
+import { getErrorMessage } from "../utils/errors";
 import { importPropertyFromUrl } from "../controllers/import.controller";
 import { Request, Response } from "express";
 import { sendTaxiRequest } from "../services/twilio.service";
@@ -18,7 +18,7 @@ import { db } from "../config/firebase";
 import { availabilityRepository } from "../repositories/availability.repository";
 import { messageRepository } from "../repositories/message.repository";
 import { populateDatabase } from "../controllers/populate.controller";
-import { getNearbyUsers, waveAtUser } from "../controllers/user.controller";
+import { getNearbyUsers } from "../controllers/user.controller";
 import { isAuthenticated } from "../middleware/auth";
 import { requireBusinessMatch } from "../middleware/requireBusinessMatch";
 
@@ -38,9 +38,6 @@ router.post(
 
 // Search
 router.post("/search", searchListings);
-
-// Payments
-router.post("/payments/create-intent", isAuthenticated, createPaymentIntent);
 
 // Listings CRUD
 router.post("/listings", isAuthenticated, createListing);
@@ -96,7 +93,7 @@ router.get(
   },
 );
 
-router.post("/listings/:id/messages", async (req: Request, res: Response) => {
+router.post("/listings/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
   const { id } = req.params;
   const msg = req.body;
   const created = await messageRepository.create(id, msg);
@@ -130,10 +127,10 @@ router.post("/whatsapp/taxi-request", async (req: Request, res: Response) => {
       status: resp.status,
     });
     res.json({ success: true, sid: resp.sid, status: resp.status });
-  } catch (err: any) {
+  } catch (err: unknown) {
     res
       .status(500)
-      .json({ error: err.message || "Failed to send taxi request" });
+      .json({ error: getErrorMessage(err) || "Failed to send taxi request" });
   }
 });
 
@@ -386,7 +383,7 @@ router.post("/whatsapp/webhook", async (req: Request, res: Response) => {
 
     // Acknowledge immediately to Twilio
     res.status(200).send("OK");
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ [WhatsApp webhook] Error:", err);
     res.status(500).send("ERROR");
   }
@@ -407,7 +404,6 @@ router.post("/admin/demote", isAuthenticated, demoteAdmin);
 
 // Social / Connect
 router.get("/users/nearby", isAuthenticated, getNearbyUsers);
-router.post("/users/wave", isAuthenticated, waveAtUser);
 
 // Places / Venues
 import {

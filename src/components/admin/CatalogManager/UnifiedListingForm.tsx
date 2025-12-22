@@ -108,7 +108,7 @@ const UnifiedListingForm: React.FC<UnifiedListingFormProps> = ({
       setTimeout(() => {
         onSuccess?.(listingData as UnifiedListing);
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save listing:", err);
       setError(err.message || "Failed to save listing");
     } finally {

@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errors';
 /**
  * Test Webhook Monitor - Sends WhatsApp and Monitors for Response
  *
@@ -34,8 +35,8 @@ This will test the bi-directional sync.`;
     logger.debug(`   Message ID: ${result.sid}`);
     logger.debug(`   Status: ${result.status}`);
     logger.debug(`\n💬 Check your WhatsApp now!\n`);
-  } catch (error: any) {
-    console.error("❌ Failed to send message:", error.message);
+  } catch (error: unknown) {
+    console.error("❌ Failed to send message:", getErrorMessage(error));
     process.exit(1);
   }
 

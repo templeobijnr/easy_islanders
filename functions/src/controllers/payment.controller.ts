@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { paymentService } from '../services/payment.service';
+import { getErrorMessage } from '../utils/errors';
 
 // POST /api/payments/create-intent
 export const createPaymentIntent = async (req: Request, res: Response) => {
@@ -9,8 +10,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
 
         const result = await paymentService.createPaymentIntent(bookingId, userId);
         res.json(result);
-    } catch (error: any) {
-        console.error('Payment Intent Error:', error.message);
-        res.status(400).json({ error: error.message });
+    } catch (error: unknown) {
+        console.error('Payment Intent Error:', getErrorMessage(error));
+        res.status(400).json({ error: getErrorMessage(error) });
     }
 };

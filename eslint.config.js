@@ -14,6 +14,8 @@ export default [
     },
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }],
+      // FRONTEND ARCHITECTURE: 300-line hard limit
+      'max-lines': ['error', { max: 300, skipBlankLines: false, skipComments: false }],
       // Formatting methods can throw when the receiver is undefined/null.
       // Always go through src/utils/formatters.ts so we have consistent null handling.
       'no-restricted-syntax': [

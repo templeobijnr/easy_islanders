@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Star, Share, Building2 } from "lucide-react";
 import { BusinessConfig, Listing } from "../../types";
-import { StorageService } from "../../services/storageService";
+import { StorageService } from "../../services/infrastructure/storage/local-storage.service";
 import ListingCard from "../../components/shared/ListingCard";
 
 interface BusinessStorefrontProps {

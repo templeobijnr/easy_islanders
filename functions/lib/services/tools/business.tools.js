@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.businessTools = void 0;
 const firebase_1 = require("../../config/firebase");
 const firestore_1 = require("firebase-admin/firestore");
+const toolContext_1 = require("./toolContext");
 const now = firestore_1.FieldValue.serverTimestamp;
 exports.businessTools = {
-    updateBusinessInfo: async (args, userId) => {
+    updateBusinessInfo: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -21,7 +23,8 @@ exports.businessTools = {
             return { success: false, error: err.message };
         }
     },
-    updateBusinessAvailability: async (args, userId) => {
+    updateBusinessAvailability: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -35,7 +38,8 @@ exports.businessTools = {
             return { success: false, error: err.message };
         }
     },
-    updateBusinessHours: async (args, userId) => {
+    updateBusinessHours: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -49,7 +53,8 @@ exports.businessTools = {
             return { success: false, error: err.message };
         }
     },
-    uploadBusinessMedia: async (args, userId) => {
+    uploadBusinessMedia: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -64,7 +69,8 @@ exports.businessTools = {
             return { success: false, error: err.message };
         }
     },
-    listBusinessLeads: async (args, userId) => {
+    listBusinessLeads: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {
@@ -75,7 +81,8 @@ exports.businessTools = {
             return { success: false, error: err.message };
         }
     },
-    respondToLead: async (args, userId) => {
+    respondToLead: async (args, userIdOrContext) => {
+        const userId = (0, toolContext_1.asToolContext)(userIdOrContext).userId;
         if (!userId)
             return { success: false, error: "Unauthorized: User ID required" };
         try {

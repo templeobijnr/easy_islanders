@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { MapPin, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const DESTINATIONS = [
   {
@@ -34,6 +35,7 @@ const DESTINATIONS = [
 ];
 
 const FeaturedDestinations: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <section className="py-24 bg-white">
       <div className="container mx-auto px-6">
@@ -62,7 +64,10 @@ const FeaturedDestinations: React.FC = () => {
                     <h3 className="text-2xl font-bold text-white mb-1">{dest.name}</h3>
                     <p className="text-slate-300 text-sm mb-4">{dest.desc}</p>
                     
-                    <div className="flex items-center gap-2 text-teal-400 text-sm font-bold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                    <div
+                      onClick={() => navigate('/discover')}
+                      className="flex items-center gap-2 text-teal-400 text-sm font-bold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 cursor-pointer"
+                    >
                        Discover <ArrowRight size={16} />
                     </div>
                  </div>

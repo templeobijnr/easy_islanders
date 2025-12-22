@@ -1,5 +1,6 @@
 import * as logger from "firebase-functions/logger";
 import { sendWhatsApp, sendTaxiRequest } from "../services/twilio.service";
+import { getErrorMessage } from '../utils/errors';
 
 async function testWhatsAppMessage() {
   const testNumber = "+905488639394";
@@ -33,8 +34,8 @@ async function testWhatsAppMessage() {
     logger.debug("✅ Taxi request sent:", result2);
 
     logger.debug("\n🎉 All tests completed successfully!");
-  } catch (error: any) {
-    console.error("❌ Error sending WhatsApp message:", error.message);
+  } catch (error: unknown) {
+    console.error("❌ Error sending WhatsApp message:", getErrorMessage(error));
     console.error(
       "\n⚠️  Make sure you have configured your Twilio credentials in .env:",
     );

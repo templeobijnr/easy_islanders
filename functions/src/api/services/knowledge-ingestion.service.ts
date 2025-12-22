@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errors';
 /**
  * Knowledge Ingestion Service (V1)
  *
@@ -192,11 +193,11 @@ async function extractTextFromPdf(
     if (!looksBad) {
       return { text: cleaned, pageCount, usedVisionFallback: false };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.info(
       "[KnowledgeIngestion] PDF local extraction unavailable/failed, falling back to Gemini",
       {
-        message: error?.message,
+        message: getErrorMessage(error),
       },
     );
   }
@@ -402,18 +403,18 @@ async function extractTextFromUrl(url: string): Promise<string> {
     }
 
     return normalizeText(bodyText);
-  } catch (error: any) {
-    if (String(error?.message || "").startsWith("URL_NOT_ALLOWED")) {
+  } catch (error: unknown) {
+    if (String(getErrorMessage(error) || "").startsWith("URL_NOT_ALLOWED")) {
       throw error;
     }
-    if (String(error?.message || "") === "URL_TOO_LARGE") {
+    if (String(getErrorMessage(error) || "") === "URL_TOO_LARGE") {
       throw new Error("URL_NOT_ALLOWED: content too large");
     }
-    if (String(error?.message || "") === "DNS_TIMEOUT") {
+    if (String(getErrorMessage(error) || "") === "DNS_TIMEOUT") {
       throw new Error("URL_NOT_ALLOWED: DNS lookup timed out");
     }
     log.info("[KnowledgeIngestion] URL extraction failed", {
-      message: error?.message,
+      message: getErrorMessage(error),
     });
     throw error;
   } finally {
@@ -640,7 +641,7 @@ export async function processKnowledgeDocIngestion(
           itemCount: extractionResult.items.length,
           runId: extractionResult.extractionRunId,
         });
-      } catch (extractError: any) {
+      } catch (extractError: unknown) {
         log.error(
           "[KnowledgeIngestion] Catalog extraction failed (non-fatal)",
           extractError,
@@ -650,7 +651,7 @@ export async function processKnowledgeDocIngestion(
           "catalogExtraction.status": "failed",
           "catalogExtraction.error": {
             code: "EXTRACT_FAILED",
-            message: extractError?.message || "Extraction failed",
+            message: getErrorMessage(extractError) || "Extraction failed",
           },
         });
       }
@@ -659,12 +660,12 @@ export async function processKnowledgeDocIngestion(
         "catalogExtraction.status": "skipped",
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error("[KnowledgeIngestion] Ingestion failed", error);
 
     await knowledgeRepository.updateDocStatus(businessId, docId, "failed", {
       code: "INGEST_FAILED",
-      message: error?.message || "Ingestion failed",
+      message: getErrorMessage(error) || "Ingestion failed",
     });
 
     throw error;

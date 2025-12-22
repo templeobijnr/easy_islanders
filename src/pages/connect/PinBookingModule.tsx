@@ -13,7 +13,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import MapMini from "../../components/admin/Shared/MapMini";
+import MapMini from "../../components/shared/MapMini";
 import { BusinessChatButton } from "../../components/business/BusinessChatWidget";
 
 interface PinBookingModuleProps {
@@ -243,7 +243,7 @@ const PinBookingModule: React.FC<PinBookingModuleProps> = ({
                         <MapMini
                           lat={coordinates.lat}
                           lng={coordinates.lng}
-                          onChange={() => {}}
+                          onChange={() => { }}
                         />
                       </div>
                       {address && (

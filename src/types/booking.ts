@@ -22,41 +22,43 @@ export interface UpsellService {
 
 export interface Booking {
   id: string;
+  userId?: string; // Added for messaging context
+  stayTitle?: string; // Added for messaging context
   itemId: string;
   itemTitle: string;
   itemImage: string;
   domain: MarketplaceDomain;
-  customerName: string; 
-  customerContact?: string; 
-  date: string; 
-  
-  status: 
-    | 'payment_pending' 
-    | 'confirmed' 
-    | 'viewing_requested' 
-    | 'viewing_awaiting_owner' 
-    | 'viewing_confirmed' 
-    | 'taxi_dispatched' 
-    | 'meeting_requested' 
-    | 'cooking' 
-    | 'ready' 
-    | 'delivered' 
-    | 'cancelled'
-    | 'new'
-    | 'served';
-  
+  customerName: string;
+  customerContact?: string;
+  date: string;
+
+  status:
+  | 'payment_pending'
+  | 'confirmed'
+  | 'viewing_requested'
+  | 'viewing_awaiting_owner'
+  | 'viewing_confirmed'
+  | 'taxi_dispatched'
+  | 'meeting_requested'
+  | 'cooking'
+  | 'ready'
+  | 'delivered'
+  | 'cancelled'
+  | 'new'
+  | 'served';
+
   totalPrice: number;
-  
+
   checkIn?: string;
   checkOut?: string;
   guests?: number;
-  viewingTime?: string; 
-  serviceDate?: string; 
+  viewingTime?: string;
+  serviceDate?: string;
   quantity?: number;
-  
+
   paymentMethod?: 'card' | 'cash' | 'crypto';
   receiptUrl?: string;
-  
+
   whatsappStatus?: 'sending' | 'sent' | 'read' | 'replied';
   agentPhone?: string;
 
@@ -64,7 +66,7 @@ export interface Booking {
   needsPickup?: boolean;
   userDetails?: UserDetails;
   selectedUpsells?: UpsellService[];
-  
+
   pickupCoordinates?: { lat: number, lng: number };
   driverDetails?: { name: string, plate: string, car: string, eta: string };
 }

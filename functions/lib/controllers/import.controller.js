@@ -37,15 +37,17 @@ exports.importPropertyFromUrl = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 const cheerio = __importStar(require("cheerio"));
 const fetchFn = globalThis.fetch;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Initialize Gemini AI client
+// Lazy initialize Gemini to avoid module-load warnings when key is injected at runtime
 let genAI = null;
-if (GEMINI_API_KEY) {
-    genAI = new generative_ai_1.GoogleGenerativeAI(GEMINI_API_KEY);
-}
-else {
-    console.warn('⚠️ GEMINI_API_KEY not found in environment');
-}
+const getGenAI = () => {
+    if (genAI)
+        return genAI;
+    const key = process.env.GEMINI_API_KEY;
+    if (!key)
+        return null;
+    genAI = new generative_ai_1.GoogleGenerativeAI(key);
+    return genAI;
+};
 /**
  * Import property from URL using Gemini AI with Google Search
  * POST /v1/import/property
@@ -209,9 +211,10 @@ const importPropertyFromUrl = async (req, res) => {
         console.log('🔵 [Import] Processing URL:', url);
         const scraped = await scrapeListing(url);
         let aiData = {};
-        if (genAI && GEMINI_API_KEY) {
+        const client = getGenAI();
+        if (client) {
             console.log('🤖 [AI] Enhancing with Gemini...');
-            const model = genAI.getGenerativeModel({
+            const model = client.getGenerativeModel({
                 model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
             }, { apiVersion: 'v1beta' });
             const hasValidScrapedData = (scraped === null || scraped === void 0 ? void 0 : scraped.title) && scraped.title.length > 10;

@@ -83,7 +83,7 @@ exports.communicationTools = {
             await firebase_1.db.collection('notifications').add({
                 userId: args.userId,
                 channel: 'app',
-                title: args.title,
+                title: args.title || 'Notification',
                 message: args.message,
                 type: args.type || 'info',
                 read: false,
@@ -107,7 +107,9 @@ exports.communicationTools = {
      * @future Implement email service integration
      */
     sendEmailNotification: async (args) => {
-        console.log("📧 [Email] Sending email notification:", args);
+        const to = args.to || args.email;
+        const body = args.body || args.message;
+        console.log("📧 [Email] Sending email notification:", { to, subject: args.subject, preview: (body || '').slice(0, 80) });
         // TODO: Implement actual email service (SendGrid, etc.)
         console.warn("⚠️ Email service not yet implemented");
         return {

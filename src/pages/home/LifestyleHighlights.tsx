@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { ArrowRight, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const EXPERIENCES = [
   {
@@ -37,6 +38,7 @@ interface LifestyleHighlightsProps {
 }
 
 const LifestyleHighlights: React.FC<LifestyleHighlightsProps> = ({ onSeeAll }) => {
+  const navigate = useNavigate();
   return (
     <section className="py-24 bg-white">
       <div className="container mx-auto px-6">
@@ -47,7 +49,10 @@ const LifestyleHighlights: React.FC<LifestyleHighlightsProps> = ({ onSeeAll }) =
               Don't just visit. <br/> <span className="text-slate-400 font-serif italic">Live the island life.</span>
             </h2>
           </div>
-          <button onClick={onSeeAll} className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-900 hover:text-teal-600 transition-colors">
+          <button
+            onClick={() => (onSeeAll ? onSeeAll() : navigate('/discover'))}
+            className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-900 hover:text-teal-600 transition-colors"
+          >
             View All Experiences <ArrowRight size={16} />
           </button>
         </div>
@@ -86,7 +91,10 @@ const LifestyleHighlights: React.FC<LifestyleHighlightsProps> = ({ onSeeAll }) =
         </div>
         
         <div className="mt-8 text-center md:hidden">
-          <button onClick={onSeeAll} className="bg-slate-900 text-white px-8 py-4 rounded-full font-bold w-full">
+          <button
+            onClick={() => (onSeeAll ? onSeeAll() : navigate('/discover'))}
+            className="bg-slate-900 text-white px-8 py-4 rounded-full font-bold w-full"
+          >
             Explore Experiences
           </button>
         </div>

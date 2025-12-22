@@ -11,6 +11,74 @@ import type {
   SearchEventsArgs,
 } from "../../types/tools";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Interfaces
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TypesenseHit {
+  id: string;
+  title: string;
+  price?: number;
+  location?: string;
+  domain?: string;
+  category?: string;
+  subCategory?: string;
+  description?: string;
+  metadata?: {
+    imageUrl?: string;
+    amenities?: string[];
+    rating?: number;
+    startsAt?: string;
+    endsAt?: string;
+  };
+}
+
+interface MapboxPlace {
+  id: string;
+  text: string;
+  place_name: string;
+  center: [number, number];
+  properties: {
+    category?: string;
+    address?: string;
+  };
+}
+
+interface SearchHousingArgs {
+  areaName?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  bedrooms?: number;
+}
+
+interface SearchPlacesArgs {
+  tag?: string;
+  category?: string;
+  limit?: number;
+}
+
+interface SearchContext {
+  marketId?: string;
+}
+
+interface SearchResult {
+  id: string;
+  title: string;
+  price?: number;
+  location?: string;
+  domain?: string;
+  category?: string;
+  subCategory?: string;
+  description?: string;
+  imageUrl?: string | null;
+  amenities?: string[];
+  rating?: number;
+}[]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search Tools Implementation
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const searchTools = {
   /**
    * Search marketplace listings using TypeSense
@@ -19,7 +87,10 @@ export const searchTools = {
     logger.debug("🔍 [Search] TypeSense Search Args:", args);
 
     try {
-      const { searchListings } = await import("../typesense.service");
+      // NOTE: Use `require()` instead of dynamic `import()` so Jest can mock this module
+      // and so unit tests don't require Node VM module flags.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { searchListings } = require("../typesense.service");
       const result = await searchListings({
         query: args.query || "*",
         domain: args.domain,
@@ -33,7 +104,7 @@ export const searchTools = {
 
       logger.debug(`🔍 [Search] Found ${result.found} items via TypeSense`);
 
-      return result.hits.map((hit: any) => ({
+      return result.hits.map((hit: TypesenseHit) => ({
         id: hit.id,
         title: hit.title,
         price: hit.price,
@@ -46,7 +117,7 @@ export const searchTools = {
         amenities: hit.metadata?.amenities,
         rating: hit.metadata?.rating,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("🔴 [Search] TypeSense Failed:", error);
       return [];
     }
@@ -59,7 +130,8 @@ export const searchTools = {
     logger.debug("🔍 [Search] Local Places (Mapbox):", args);
 
     try {
-      const { searchMapboxPlaces } = await import("../mapbox.service");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { searchMapboxPlaces } = require("../mapbox.service");
 
       // Construct a query that includes location for better accuracy
       const query = args.location
@@ -73,7 +145,7 @@ export const searchTools = {
 
       logger.debug(`🔍 [Search Local] Found ${places.length} items via Mapbox`);
 
-      return places.map((place: any) => ({
+      return places.map((place: MapboxPlace) => ({
         id: place.id,
         title: place.text,
         price: 0, // Mapbox doesn't provide price
@@ -90,7 +162,7 @@ export const searchTools = {
           lng: place.center[0],
         },
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("🔴 [Search Local] Failed:", error);
       return [];
     }
@@ -103,7 +175,8 @@ export const searchTools = {
     logger.debug("🔍 [Search] Events:", args);
 
     try {
-      const { searchListings } = await import("../typesense.service");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { searchListings } = require("../typesense.service");
       const result = await searchListings({
         query: args.query || "*",
         domain: "Events",
@@ -113,7 +186,7 @@ export const searchTools = {
 
       logger.debug(`🔍 [Search Events] Found ${result.found} events`);
 
-      return result.hits.map((hit: any) => ({
+      return result.hits.map((hit: TypesenseHit) => ({
         id: hit.id,
         title: hit.title,
         price: hit.price,
@@ -123,7 +196,7 @@ export const searchTools = {
         startsAt: hit.metadata?.startsAt,
         endsAt: hit.metadata?.endsAt,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("🔴 [Search Events] Failed:", error);
       return [];
     }
@@ -132,9 +205,10 @@ export const searchTools = {
   /**
    * Search specifically for housing
    */
-  searchHousingListings: async (args: any, ctx: any): Promise<any> => {
+  searchHousingListings: async (args: SearchHousingArgs, _ctx: SearchContext): Promise<unknown> => {
     logger.debug("🏠 [Search] Housing:", args);
-    const { searchListings } = await import("../typesense.service");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { searchListings } = require("../typesense.service");
 
     // Map args to searchListings params
     return searchListings({
@@ -152,11 +226,12 @@ export const searchTools = {
   /**
    * Search curated places
    */
-  searchPlaces: async (args: any, ctx: any): Promise<any> => {
+  searchPlaces: async (args: SearchPlacesArgs, _ctx: SearchContext): Promise<unknown> => {
     logger.debug("📍 [Search] Curated Places:", args);
     // Try Typesense first for curated places
     try {
-      const { searchListings } = await import("../typesense.service");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { searchListings } = require("../typesense.service");
       const result = await searchListings({
         query: args.tag || "*",
         domain: "Places",
@@ -172,7 +247,8 @@ export const searchTools = {
     }
 
     // Fallback to Mapbox if no curated places found
-    const { searchMapboxPlaces } = await import("../mapbox.service");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { searchMapboxPlaces } = require("../mapbox.service");
     const query = `${args.category || ""} ${args.tag || ""}`;
     return searchMapboxPlaces(query, {
       types: "poi",

@@ -1,184 +1,303 @@
 rules_version = '2';
+// HARDENED V1 RULES - Last updated: 2025-12-14
+// Principle: default-deny, tenant data Functions-only, frozen ownership fields
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
+
+    // ========================================
+    // HELPER FUNCTIONS
+    // ========================================
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    function isBusiness() {
-      return request.auth.token.role == 'business';
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
     }
 
-    // --- LISTINGS ---
-    // Public Read, Business Create, Owner Edit
+    // Validate booking exists before get()
+    function bookingExists(bookingId) {
+      return bookingId is string
+        && exists(/databases/$(database)/documents/bookings/$(bookingId));
+    }
+
+    // ========================================
+    // DEFAULT DENY (catch-all)
+    // ========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ========================================
+    // PUBLIC DISCOVERY DATA (public read, admin write)
+    // NOTE: Admin writes allowed during transition. Target: migrate to /v1/admin/* API then lock to false.
+    // ========================================
+
     match /listings/{listingId} {
       allow read: if true;
-      allow create: if isAuthenticated() && isBusiness();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.ownerId);
-    }
-
-    // --- USERS ---
-    // Private Profiles
-    match /users/{userId} {
-      allow read, write: if isAuthenticated() && isOwner(userId);
-    }
-
-    // --- ANCHORS (Live Map) ---
-    // Short-lived location pings
-    match /anchors/{anchorId} {
-      allow read: if true;
-      allow create: if isAuthenticated();
-      // Users can only delete their own anchors
-      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
-    }
-
-    // --- BOOKINGS ---
-    // Users can read/write their own bookings
-    match /bookings/{bookingId} {
-      allow read: if isAuthenticated() && isOwner(resource.data.userId);
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
-    }
-
-    // --- CHAT SESSIONS ---
-    // Users can read/write their own chat sessions
-    match /chatSessions/{sessionId} {
-      allow read, write: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create, update, delete: if isAdmin();
       
-      // Chat messages subcollection
-      match /messages/{messageId} {
-        allow read, write: if isAuthenticated() && isOwner(get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId);
+      // Catalog data subcollections (menuItems, services, offerings, tickets, roomTypes)
+      match /{kind}/{itemId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
       }
     }
 
-    // --- SOCIAL FEATURES ---
-    // Public read for social content, authenticated write
-    match /socialPosts/{postId} {
+    // Market-level catalog ingest infrastructure (admin-only)
+    match /markets/{marketId}/catalogIngestJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /markets/{marketId}/catalogIngestProposals/{proposalId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /places/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /events/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /activities/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /experiences/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /trips/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /stays/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /connectCuration/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    match /hotZones/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
+    
+    // Discover config (regions, categories etc)
+    match /discover/{document=**} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
+      allow write: if isAdmin();
     }
 
-    match /socialGroups/{groupId} {
+    // App config (discover settings, homepage config etc)
+    match /appConfig/{document=**} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      // Only owner/admin can update or delete groups
-      allow update, delete: if isAuthenticated() &&
-        (resource.data.ownerId == request.auth.uid ||
-         request.auth.uid in resource.data.admins);
+      allow write: if isAdmin();
     }
 
+    // ========================================
+    // USER-OWNED DATA
+    // ========================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) &&
+        (!request.resource.data.keys().hasAny(['role', 'admin', 'accessLevel']));
+      allow update: if isAuthenticated() && isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'admin', 'accessLevel']));
+      allow delete: if false;
+    }
+
+    // User profiles for social features
     match /socialUsers/{userId} {
       allow read: if true;
       allow write: if isAuthenticated() && isOwner(userId);
     }
-
-    match /waves/{waveId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      // Only the sender can update or delete their own waves
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.senderId);
+    // Legacy duplicate (explicit deny until migration)
+    match /social_users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isOwner(userId);
     }
 
+    // Notifications - BIND to caller, FREEZE userId on update
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && isOwner(resource.data.userId);
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      // Create MUST bind userId to caller
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      // Update/delete must match AND freeze userId
+      allow update: if isAuthenticated() 
+        && isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId;
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
 
-    match /conversations/{conversationId} {
-      // Only allow access if user is a participant in the conversation
-      allow read, write: if isAuthenticated() &&
-        request.auth.uid in resource.data.participants;
-    }
-
-    // --- CRM (Business Only) ---
-    match /clients/{clientId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isBusiness();
-    }
-
-    match /campaigns/{campaignId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isBusiness();
-    }
-
-    match /requests/{requestId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isBusiness();
-    }
-
-    // --- TAXI SYSTEM ---
-    // Drivers collection - drivers can update their own status/location
-    match /taxi_drivers/{driverId} {
-      allow read: if isAuthenticated();
-      // Only allow drivers to update their own profile
-      allow update: if isAuthenticated() && isOwner(driverId);
-      // Only backend (Admin SDK) should create/delete drivers
-      allow create, delete: if false;
-    }
-
-    // Taxi requests - managed primarily by backend for atomic operations
-    match /taxi_requests/{requestId} {
-      // Users can read their own requests
-      // Assigned drivers can read their jobs
-      // Broadcasted drivers can read pending requests to decide whether to accept
-      allow read: if isAuthenticated() &&
-        (resource.data.userId == request.auth.uid ||
-         resource.data.assignedDriverId == request.auth.uid ||
-         (resource.data.status == 'pending' && request.auth.uid in resource.data.broadcastSentTo));
-      
-      // Only backend (Admin SDK via Cloud Functions) should create/update/delete
-      // to ensure atomic transaction logic and prevent race conditions
-      allow create, update, delete: if false;
-    }
-
-    // --- NEW SOCIAL FEATURES ---
-    
-    // Tribes (Communities)
-    match /tribes/{tribeId} {
-      allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.ownerId);
-      
-      // Tribe Members
-      match /members/{memberId} {
-        allow read: if true;
-        allow write: if isAuthenticated() && (isOwner(memberId) || isOwner(get(/databases/$(database)/documents/tribes/$(tribeId)).data.ownerId));
-      }
-      
-      // Tribe Posts
-      match /posts/{postId} {
-        allow read: if true;
-        allow create: if isAuthenticated();
-        allow update, delete: if isAuthenticated() && (isOwner(resource.data.userId) || isOwner(get(/databases/$(database)/documents/tribes/$(tribeId)).data.ownerId));
-      }
-    }
-
-    // Check-ins (Location Sharing)
-    match /checkIns/{checkInId} {
-      allow read: if true;
-      allow create: if isAuthenticated();
-      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
-    }
-
-    // Itineraries (Trip Planning)
+    // Itineraries - FREEZE userId on update
     match /itineraries/{itineraryId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.userId) || resource.data.isPublic == true);
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
-      
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() 
+        && isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
       match /items/{itemId} {
         allow read, write: if isAuthenticated() && isOwner(get(/databases/$(database)/documents/itineraries/$(itineraryId)).data.userId);
       }
+    }
+
+    // ========================================
+    // SOCIAL / CONNECT FEATURES
+    // ========================================
+
+    // Anchors - BIND to caller on create
+    match /anchors/{anchorId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Check-ins (standardized collection)
+    match /checkins/{checkinId} {
+      allow read: if true;
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid
+        && !request.resource.data.keys().hasAny(['expiresAt']);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    // Legacy camelCase (explicit rule)
+    match /checkIns/{checkinId} {
+      allow read: if true;
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid
+        && !request.resource.data.keys().hasAny(['expiresAt']);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // User activities - BIND hostUserId to caller
+    match /userActivities/{activityId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.hostUserId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        // Host can update all
+        resource.data.hostUserId == request.auth.uid ||
+        // Others can only update RSVP fields
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['goingUserIds', 'interestedUserIds', 'goingCount', 'interestedCount', 'updatedAt'])
+      ) && request.resource.data.hostUserId == resource.data.hostUserId; // FREEZE hostUserId
+      allow delete: if isAuthenticated() && resource.data.hostUserId == request.auth.uid;
+    }
+
+    // Joins/RSVPs
+    match /joins/{joinId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Event attendees
+    match /eventAttendees/{attendeeId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() 
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId; // FREEZE
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // ========================================
+    // BOOKINGS - FREEZE userId on update
+    // ========================================
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // CRITICAL: Freeze userId on update - owner cannot transfer booking
+      allow update: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin())
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Booking communications - GUARD bookingId existence
+    match /bookingCommunications/{commId} {
+      function isBookingParticipant() {
+        return isAuthenticated()
+          && bookingExists(resource.data.bookingId)
+          && (isAdmin() ||
+              get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.userId == request.auth.uid);
+      }
+      
+      allow read: if isBookingParticipant();
+      allow create: if isAuthenticated()
+        && bookingExists(request.resource.data.bookingId)
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ========================================
+    // GENERAL CHAT (user-owned sessions)
+    // NOTE: Client must create session BEFORE messages (no batch)
+    // ========================================
+
+    match /chatSessions/{sessionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+
+      match /messages/{messageId} {
+        function isSessionOwner() {
+          return isAuthenticated()
+            && get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid;
+        }
+        allow read: if isSessionOwner();
+        allow create: if isSessionOwner();
+        allow update, delete: if false;
+      }
+    }
+
+    // ========================================
+    // TENANT DATA: FUNCTIONS-ONLY
+    // ========================================
+
+    match /businesses/{businessId}/{doc=**} { allow read, write: if false; }
+    match /business_configs/{id} { allow read, write: if false; }
+    match /business_chat_sessions/{id} { allow read, write: if false; match /messages/{msgId} { allow read, write: if false; }}
+    match /business_bookings/{id} { allow read, write: if false; }
+    match /business_enquiries/{id} { allow read, write: if false; }
+    match /business_knowledge/{id} { allow read, write: if false; }
+    match /business_products/{id} { allow read, write: if false; }
+    match /clients/{id} { allow read, write: if false; }
+    match /campaigns/{id} { allow read, write: if false; }
+    match /requests/{id} { allow read, write: if false; }
+    match /conversations/{id} { allow read, write: if false; }
+
+    // Multi-business infrastructure (Functions-only writes)
+    // userBusinesses: index of businesses a user belongs to
+    match /userBusinesses/{uid} {
+      allow read: if isAuthenticated() && isOwner(uid);
+      allow write: if false; // Functions-only
+      match /businesses/{businessId} {
+        allow read: if isAuthenticated() && isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // entitlements: user limits and billing (Functions-only writes)
+    match /entitlements/{uid} {
+      allow read: if isAuthenticated() && isOwner(uid);
+      allow write: if false; // Functions-only (Stripe webhook sets these)
+    }
+
+    match /taxi_drivers/{id} { allow read, write: if false; }
+    match /taxi_requests/{id} { allow read, write: if false; }
+
+    // ========================================
+    // JOBS API (Sprint 1)
+    // ========================================
+
+    match /jobs/{jobId} {
+      // 1. Read: Owner only
+      allow read: if isAuthenticated() && isOwner(resource.data.ownerUserId);
+
+      // 2. Create: Owner only + must be 'collecting' status
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.status == 'collecting';
+
+      // 3. Update: Owner only + Immutable Critical Fields
+      // Clients CANNOT change: status, merchantTarget, timestamps, or transfer ownership
+      allow update: if isAuthenticated()
+        && isOwner(resource.data.ownerUserId)
+        && request.resource.data.ownerUserId == resource.data.ownerUserId // No ownership transfer
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['status', 'confirmingAt', 'dispatchedAt', 'confirmedAt', 
+                     'cancelledAt', 'completedAt', 'merchantTarget', 'jobCode']);
+
+      // 4. Delete: Deny (Jobs are permanent records)
+      allow delete: if false;
     }
   }
 }

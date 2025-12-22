@@ -1,4 +1,4 @@
-import { getV1GatewayBaseUrl } from "../services/v1Api";
+import { getV1GatewayBaseUrl } from "../services/integrations/backend/v1.api";
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");

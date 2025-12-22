@@ -21,7 +21,7 @@ async function testTaxiDispatch() {
   logger.debug("📍 Test 1: Kyrenia Marina to Bellapais\n");
 
   try {
-    const result = await toolResolvers.dispatchTaxi(
+    const result = (await toolResolvers.dispatchTaxi(
       {
         pickupLocation: "Kyrenia Marina",
         destination: "Bellapais Abbey",
@@ -33,7 +33,7 @@ async function testTaxiDispatch() {
         notes: "This is a test dispatch from City OS",
       },
       "test-user-123",
-    );
+    )) as any;
 
     logger.debug("\n✅ Taxi Dispatch Result:");
     logger.debug(JSON.stringify(result, null, 2));
@@ -69,7 +69,7 @@ async function testTaxiDispatch() {
   logger.debug("📍 Test 2: Generic Taxi Request (Airport)\n");
 
   try {
-    const result2 = await toolResolvers.dispatchTaxi(
+    const result2 = (await toolResolvers.dispatchTaxi(
       {
         pickupLocation: "Ercan Airport",
         destination: "Kyrenia Center",
@@ -78,7 +78,7 @@ async function testTaxiDispatch() {
         notes: "Luggage: 2 suitcases",
       },
       "test-user-456",
-    );
+    )) as any;
 
     logger.debug("\n✅ Taxi Dispatch Result:");
     logger.debug(JSON.stringify(result2, null, 2));

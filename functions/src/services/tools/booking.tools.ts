@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errors';
 /**
  * Booking & Reservation Tools
  *
@@ -15,14 +16,50 @@ import { listingRepository } from "../../repositories/listing.repository";
 import { db } from "../../config/firebase";
 import type { Channel } from "../../types/transaction";
 import { createHeldBooking, resolveBusinessId } from "./booking-ledger.tools";
-import { asToolContext } from "./toolContext";
+import { asToolContext, UserIdOrToolContext, ToolContext } from "./toolContext";
 
 const now = FieldValue.serverTimestamp;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed Arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface InitiateBookingArgs {
+  itemId?: string;
+  listingId?: string;
+  offeringId?: string;
+  itemTitle?: string;
+  offeringName?: string;
+  date?: string;
+  checkInDate?: string;
+  time?: string;
+  guests?: number;
+  partySize?: number;
+  customerName?: string;
+  specialRequests?: string;
+  notes?: string;
+}
+
+interface ListingData {
+  price?: number | string;
+  currency?: string;
+  category?: string;
+  subCategory?: string;
+  agentPhone?: string;
+  ownerContact?: string;
+  whatsappNumber?: string;
+}
+
+interface ExtendedContext extends ToolContext {
+  actor?: {
+    phoneE164?: string;
+  };
+}
 
 interface ToolResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 function mapToLedgerChannel(channel: unknown): Channel {
@@ -38,7 +75,7 @@ export const bookingTools = {
    */
   createBooking: async (
     args: CreateBookingArgs,
-    userIdOrContext: any,
+    userIdOrContext: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const ctx = asToolContext(userIdOrContext);
     const userId = ctx.userId;
@@ -59,12 +96,14 @@ export const bookingTools = {
 
     const bookingId = `ORD-${Date.now()}`;
     const confirmationNumber = `CFM-${Date.now()}`;
-    const currency = (item as any).currency || "GBP";
+    const itemData = item as unknown as ListingData;
+    const currency = itemData.currency || "GBP";
     const totalPrice =
-      typeof (item as any).price === "number"
-        ? (item as any).price
-        : parseFloat((item as any).price as any) || 0;
+      typeof itemData.price === "number"
+        ? itemData.price
+        : parseFloat(String(itemData.price)) || 0;
 
+    const extArgs = args as CreateBookingArgs & { needsPickup?: boolean; checkInDate?: string; checkOutDate?: string; viewingSlot?: string };
     const bookingData = {
       id: bookingId,
       userId,
@@ -77,10 +116,10 @@ export const bookingTools = {
       customerName: args.customerName,
       customerContact: args.customerContact,
       specialRequests: args.specialRequests || "",
-      needsPickup: (args as any).needsPickup || false,
-      checkIn: (args as any).checkInDate || args.checkIn || null,
-      checkOut: (args as any).checkOutDate || args.checkOut || null,
-      viewingTime: (args as any).viewingSlot || null,
+      needsPickup: extArgs.needsPickup || false,
+      checkIn: extArgs.checkInDate || args.checkIn || null,
+      checkOut: extArgs.checkOutDate || args.checkOut || null,
+      viewingTime: extArgs.viewingSlot || null,
       status: "payment_pending",
       confirmationNumber,
       createdAt: now(),
@@ -98,7 +137,7 @@ export const bookingTools = {
         confirmationNumber,
         itemTitle: item.title,
         category:
-          (item as any).category || (item as any).subCategory || item.domain,
+          itemData.category || itemData.subCategory || item.domain,
         total: totalPrice,
         currency,
       },
@@ -110,7 +149,7 @@ export const bookingTools = {
    */
   scheduleViewing: async (
     args: ScheduleViewingArgs,
-    userIdOrContext: any,
+    userIdOrContext: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const ctx = asToolContext(userIdOrContext);
     const userId = ctx.userId;
@@ -131,10 +170,11 @@ export const bookingTools = {
       }
 
       const vrId = `VR-${Date.now()}`;
+      const itemData = item as unknown as ListingData;
       const ownerContact =
-        (item as any).agentPhone ||
-        (item as any).ownerContact ||
-        (item as any).whatsappNumber;
+        itemData.agentPhone ||
+        itemData.ownerContact ||
+        itemData.whatsappNumber;
 
       const payload = {
         id: vrId,
@@ -169,7 +209,7 @@ export const bookingTools = {
           logger.debug(
             `✅ Viewing request sent via WhatsApp to ${ownerContact}`,
           );
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("⚠️ Failed to send WhatsApp notification:", err);
           // Don't fail the whole request if WhatsApp fails
         }
@@ -179,11 +219,11 @@ export const bookingTools = {
         success: true,
         viewingRequest: payload,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [ScheduleViewing] Failed:", err);
       return {
         success: false,
-        error: err.message || "Failed to schedule viewing",
+        error: getErrorMessage(err) || "Failed to schedule viewing",
       };
     }
   },
@@ -193,7 +233,7 @@ export const bookingTools = {
    */
   createPaymentIntent: async (
     args: CreatePaymentIntentArgs,
-    userIdOrContext: any,
+    userIdOrContext: UserIdOrToolContext,
   ): Promise<ToolResult> => {
     const ctx = asToolContext(userIdOrContext);
     const userId = ctx.userId;
@@ -223,11 +263,11 @@ export const bookingTools = {
         bookingId: args.bookingId,
         payment: intent,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🔴 [CreatePaymentIntent] Failed:", err);
       return {
         success: false,
-        error: err.message || "Failed to create payment intent",
+        error: getErrorMessage(err) || "Failed to create payment intent",
       };
     }
   },
@@ -239,10 +279,10 @@ export const bookingTools = {
    * This is the channel-agnostic equivalent of the controller-specific booking flow.
    */
   initiateBooking: async (
-    args: any,
-    userIdOrContext: any,
+    args: InitiateBookingArgs,
+    userIdOrContext: UserIdOrToolContext,
   ): Promise<ToolResult> => {
-    const ctx = asToolContext(userIdOrContext);
+    const ctx = asToolContext(userIdOrContext) as ExtendedContext;
     const userId = ctx.userId;
     if (!userId) {
       return { success: false, error: "Unauthorized: User ID required" };
@@ -274,8 +314,8 @@ export const bookingTools = {
       channel: mapToLedgerChannel(ctx.channel),
       actor: {
         userId,
-        name: args?.customerName,
-        phoneE164: (ctx as any)?.actor?.phoneE164 as any,
+        name: args.customerName,
+        phoneE164: ctx.actor?.phoneE164,
       },
       date,
       time,

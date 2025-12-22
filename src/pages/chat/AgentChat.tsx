@@ -1,13 +1,12 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, MapPin, Loader2, ArrowRight, Star, ShieldCheck, Clock, Zap, Home, Car, Utensils, Search, Sparkles } from 'lucide-react';
 import { Message, LoadingState, UnifiedItem, AgentPersona } from '../../types';
-import { sendMessageToAgent } from '../../services/geminiService';
-import { StorageService } from '../../services/storageService';
+import { sendMessageToAgent } from '../../services/integrations/gemini/gemini.client';
+import { StorageService } from '../../services/infrastructure/storage/local-storage.service';
 import { AVAILABLE_AGENTS, ALL_MOCK_ITEMS } from '../../components/constants';
-import BookingModal from '../../components/booking/BookingModal';
+import { BookingModal } from '../../components/shared/modals';
 import AgentSelector from './AgentSelector';
-import PaymentCard from './cards/PaymentCard';
 import RecommendationCard from './cards/RecommendationCard';
 import ReceiptCard from './cards/ReceiptCard';
 import TaxiStatusCard from './cards/TaxiStatusCard';
@@ -43,8 +42,8 @@ const WelcomeCard: React.FC<{ agent: AgentPersona }> = ({ agent }) => (
       ))}
     </div>
 
-    <div className="text-center text-xs text-slate-400 border-t border-slate-100 pt-4">
-      I can help you find villas, cars, or plan your entire trip in seconds.
+    <div className="text-center text-xs text-slate-400 border-t border-slate-100 pt-4 px-4 leading-relaxed">
+      Your personal island assistant that helps you find places, compare options, and book anything through simple chat.
     </div>
   </div>
 );
@@ -143,7 +142,9 @@ const ChatBubble: React.FC<{
 
           {/* Embedded Cards */}
           {message.paymentRequest && message.booking && (
-            <PaymentCard booking={message.booking} onPaid={() => onPayment(message.booking!.id)} />
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Payments are not available yet. We’ll confirm this booking via WhatsApp or in-app message.
+            </div>
           )}
 
           {message.booking && message.booking.status === 'confirmed' && (
@@ -183,7 +184,13 @@ const ChatBubble: React.FC<{
 
 // --- MAIN COMPONENT ---
 
-const AgentChat: React.FC = () => {
+import { isNearBottom } from "@/features/chat/utils/autoscroll";
+
+type AgentChatProps = {
+  variant?: "embedded" | "page";
+};
+
+const AgentChat: React.FC<AgentChatProps> = ({ variant = "page" }) => {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const [currentAgent, setCurrentAgent] = useState<AgentPersona>(AVAILABLE_AGENTS[0]);
@@ -193,16 +200,28 @@ const AgentChat: React.FC = () => {
   const [loadingText, setLoadingText] = useState(t('agent_thinking'));
   const [selectedItem, setSelectedItem] = useState<UnifiedItem | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
 
   // Reset messages when user changes (login/logout)
   useEffect(() => {
     setMessages([]);
   }, [user?.id]);
 
+  const onMessagesScroll = useCallback(() => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    shouldStickToBottomRef.current = isNearBottom(el);
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loadingState]);
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    if (shouldStickToBottomRef.current) {
+      // Container-only scroll; avoid smooth scrolling to prevent viewport jumps.
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages.length, loadingState]);
 
   // Generate welcome message based on agent persona
   const getWelcomeMessage = (agent: AgentPersona) => {
@@ -235,6 +254,8 @@ const AgentChat: React.FC = () => {
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || loadingState === LoadingState.LOADING) return;
+    // If the user is sending a message, we want to stick to the bottom.
+    shouldStickToBottomRef.current = true;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -313,10 +334,20 @@ const AgentChat: React.FC = () => {
     }));
   };
 
+  const containerClass =
+    variant === "page"
+      ? "container mx-auto px-2 md:px-4 py-4 md:py-12 relative z-10"
+      : "container mx-auto px-2 md:px-4 py-6 md:py-10 relative z-10";
+
+  const panelHeightClass =
+    variant === "page"
+      ? "h-[calc(100vh-6rem)] md:h-[800px]"
+      : "h-[720px] md:h-[720px]";
+
   return (
-    <div id="agent" className="container mx-auto px-2 md:px-4 py-4 md:py-12 relative z-10">
+    <div className={containerClass}>
       {/* MAIN GLASS CONTAINER - Mobile Responsive Height */}
-      <div className="max-w-6xl mx-auto bg-white/80 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-white/60 overflow-hidden flex flex-col md:flex-row h-[calc(100vh-6rem)] md:h-[800px] ring-1 ring-white/40 relative">
+      <div className={`max-w-6xl mx-auto bg-white/80 backdrop-blur-2xl rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-white/60 overflow-hidden flex flex-col md:flex-row ${panelHeightClass} ring-1 ring-white/40 relative`}>
 
         {/* Background Ambient Effects */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
@@ -361,7 +392,11 @@ const AgentChat: React.FC = () => {
           </div>
 
           {/* MESSAGES FEED */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar relative">
+          <div
+            ref={messagesScrollRef}
+            onScroll={onMessagesScroll}
+            className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar relative"
+          >
 
             {/* ZERO STATE */}
             {messages.length === 0 && (
@@ -391,7 +426,6 @@ const AgentChat: React.FC = () => {
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* INPUT AREA */}

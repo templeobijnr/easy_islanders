@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "618304320776",
+    "project_id": "easy-islanders",
+    "storage_bucket": "easy-islanders.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618304320776:android:bd7229b65b8d05067628bd",
+        "android_client_info": {
+          "package_name": "com.askmerve.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuEyw1Lx9tjqU1X8u1ZlTq315_V54U-ls"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
