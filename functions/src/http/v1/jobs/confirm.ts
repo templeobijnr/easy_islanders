@@ -15,6 +15,7 @@ import {
   type JobStatus,
 } from "@askmerve/shared";
 import { getUserId, asyncHandler, Errors } from "../../../lib/middleware";
+import { auditRepository } from "../../../services/domains/audit/audit.repository";
 
 // =============================================================================
 // REQUEST SCHEMA
@@ -74,6 +75,16 @@ export const confirmJob = asyncHandler(
     const currentStatus = job.status;
     const targetStatus: JobStatus = "confirming";
 
+    // Idempotent behavior: confirming twice returns current job (no error).
+    if (currentStatus === "confirming") {
+      res.status(200).json({
+        success: true,
+        data: job,
+        idempotent: true,
+      });
+      return;
+    }
+
     if (!isValidJobTransition(currentStatus, targetStatus)) {
       throw Errors.invalidTransition(currentStatus, targetStatus);
     }
@@ -88,6 +99,20 @@ export const confirmJob = asyncHandler(
       confirmedByUserAt: now,
       updatedAt: now,
     };
+
+    // Enforce audit event on transition (fail-closed: if audit write fails, do not transition)
+    const idemKey = req.get("x-idempotency-key") || `job_confirm:${jobId}:${userId}`;
+    await auditRepository.appendJobAuditIdempotent(jobId, {
+      id: idemKey,
+      action: "JOB_CONFIRMED_BY_USER",
+      actorType: "user",
+      actorId: userId,
+      traceId: traceId || `trc-${Date.now()}`,
+      idempotencyKey: idemKey,
+      before: { status: currentStatus },
+      after: { status: targetStatus },
+      evidenceRefs: [{ kind: "http", ref: `v1/jobs/${jobId}/confirm` }],
+    });
 
     await jobRef.update(updateData);
 

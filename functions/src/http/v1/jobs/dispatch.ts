@@ -19,7 +19,8 @@ import {
   type JobStatus,
 } from "@askmerve/shared";
 import { getUserId, asyncHandler, Errors } from "../../../lib/middleware";
-import { sendWhatsApp } from "../../../services/twilio.service";
+import { DispatchService } from "../../../services/domains/dispatch/dispatch.service";
+import { auditRepository } from "../../../services/domains/audit/audit.repository";
 
 // =============================================================================
 // REQUEST SCHEMA
@@ -156,6 +157,20 @@ export const dispatchJob = asyncHandler(
     let dispatchedVia: "push" | "whatsapp" | "sms" = "whatsapp";
     const jobSummary = buildJobSummary(job);
     const webUrl = process.env.VITE_WEB_URL || "https://askmerve.app";
+    const dispatchIdemKey = req.get("x-idempotency-key") || `dispatch:job:${job.id}`;
+
+    // Fail-closed precondition: write an audit reservation before any provider call.
+    await auditRepository.appendJobAuditIdempotent(job.id, {
+      id: `${dispatchIdemKey}:reserved`,
+      action: "JOB_DISPATCH_RESERVED",
+      actorType: "user",
+      actorId: userId,
+      traceId: traceId || `trc-${Date.now()}`,
+      idempotencyKey: dispatchIdemKey,
+      before: { status: currentStatus },
+      after: { status: "dispatching" },
+      evidenceRefs: [{ kind: "idempotencyKey", ref: dispatchIdemKey }],
+    });
 
     if (job.merchantTarget.type === "listing") {
       // Listed Merchant: Generate Magic Link
@@ -197,10 +212,16 @@ export const dispatchJob = asyncHandler(
       const magicLink = `${webUrl}/m?token=${rawToken}`;
       const message = `${jobSummary}\n\n🔗 Accept or decline:\n${magicLink}`;
 
-      const result = await sendWhatsApp(merchantPhone, message, {
-        role: "merchant",
+      const dispatch = await DispatchService.sendWhatsApp({
+        kind: "job_dispatch",
+        toE164: merchantPhone,
+        body: message,
+        correlationId: `job:${job.id}:merchant:${job.merchantTarget.type}`,
+        idempotencyKey: dispatchIdemKey,
+        traceId: traceId || `trc-${Date.now()}`,
+        jobId: job.id,
       });
-      messageId = result?.sid || `local-${Date.now()}`;
+      messageId = dispatch.providerMessageId || `local-${Date.now()}`;
       dispatchedVia = "whatsapp";
 
       logger.debug(`[Dispatch] Listed merchant - Magic link sent`, {
@@ -216,10 +237,16 @@ export const dispatchJob = asyncHandler(
 
       const message = `${jobSummary}\n\nHi ${merchantName}, please reply:\n✅ YES to accept\n❌ NO to decline\n\n(Job Code: ${job.jobCode})`;
 
-      const result = await sendWhatsApp(merchantPhone, message, {
-        role: "merchant",
+      const dispatch = await DispatchService.sendWhatsApp({
+        kind: "job_dispatch",
+        toE164: merchantPhone,
+        body: message,
+        correlationId: `job:${job.id}:merchant:${job.merchantTarget.type}`,
+        idempotencyKey: dispatchIdemKey,
+        traceId: traceId || `trc-${Date.now()}`,
+        jobId: job.id,
       });
-      messageId = result?.sid || `local-${Date.now()}`;
+      messageId = dispatch.providerMessageId || `local-${Date.now()}`;
       dispatchedVia = "whatsapp";
 
       logger.debug(`[Dispatch] Unlisted merchant - Text sent`, {
@@ -241,6 +268,22 @@ export const dispatchJob = asyncHandler(
       dispatchAttempts: (job.dispatchAttempts || 0) + 1,
       updatedAt: now,
     };
+
+    // Audit: dispatched (evidence includes provider message id)
+    await auditRepository.appendJobAuditIdempotent(job.id, {
+      id: `${dispatchIdemKey}:dispatched`,
+      action: "JOB_DISPATCHED",
+      actorType: "system",
+      actorId: "system",
+      traceId: traceId || `trc-${Date.now()}`,
+      idempotencyKey: dispatchIdemKey,
+      before: { status: currentStatus },
+      after: { status: targetStatus, dispatchMessageId: messageId },
+      evidenceRefs: [
+        { kind: "dispatchMessageIdempotencyKey", ref: dispatchIdemKey },
+        { kind: "providerMessageId", ref: String(messageId) },
+      ],
+    });
 
     await jobRef.update(updateData);
 

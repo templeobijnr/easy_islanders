@@ -7,7 +7,19 @@
  * - Main file remains composer (loading child decks)
  * - Behavior preserved: yes (no UI change)
  */
-export type Deck = "catalog" | "connect" | "performance" | "settings" | "admin" | "bookings" | "discover";
+export type Deck =
+    | "mission"
+    | "catalog"
+    | "connect"
+    | "discover"
+    | "bookings"
+    | "merve"
+    | "admin"
+    | "financials"
+    | "algorithm"
+    | "moderation"
+    | "sysconfig";
+
 export type ConnectTab = "curation" | "events" | "live";
 export type CatalogTab = "all" | "places" | "stays" | "activities" | "events" | "experiences";
 
@@ -18,5 +30,7 @@ export interface ControlTowerProps {
 export interface DeckConfig {
     id: Deck;
     label: string;
-    icon: React.ComponentType<{ className?: string; size?: number }>;
+    icon: React.ComponentType<{ size?: number }>;
+    disabled?: boolean;
+    comingSoon?: boolean;
 }

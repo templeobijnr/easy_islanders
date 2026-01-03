@@ -133,7 +133,7 @@ export async function processMessage(
         // 6. Generate response
         const genAI = getGenAI();
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
             generationConfig: {
                 maxOutputTokens: 500,
                 temperature: 0.7
@@ -166,7 +166,7 @@ export async function processMessage(
                 score: s.score
             })),
             meta: {
-                model: 'gemini-2.0-flash-exp',
+                model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
                 latencyMs: generateLatency
             }
         });

@@ -116,12 +116,12 @@ export function loadConfig(): EnvConfig {
   _config = {
     gemini: {
       apiKey: requireEnv("GEMINI_API_KEY"),
-      model: optionalEnv("GEMINI_MODEL", "gemini-2.0-flash-exp") as string,
+      model: optionalEnv("GEMINI_MODEL", "gemini-2.5-flash") as string,
       visionModel: optionalEnv(
         "GEMINI_VISION_MODEL",
-        "gemini-2.0-flash",
+        "gemini-2.5-flash",
       ) as string,
-      chatModel: optionalEnv("GEMINI_CHAT_MODEL", "gemini-2.0-flash") as string,
+      chatModel: optionalEnv("GEMINI_CHAT_MODEL", "gemini-2.5-flash") as string,
     },
 
     firebase: {

@@ -1,12 +1,18 @@
 import * as logger from "firebase-functions/logger";
 import "dotenv/config";
-import { client } from "../services/typesense.service";
+import { getTypesenseClient } from "../services/typesense.service";
 import { getErrorMessage } from '../utils/errors';
 
 async function testSearch() {
   logger.debug("🔍 Testing Typesense Search...");
 
   try {
+    const client = getTypesenseClient();
+    if (!client) {
+      logger.error("❌ Typesense client not available - TYPESENSE_API_KEY not configured");
+      return;
+    }
+
     // 1. Check Collection
     logger.debug("\nChecking Collection...");
     try {

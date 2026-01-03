@@ -5,6 +5,7 @@
  */
 
 import * as logger from "firebase-functions/logger";
+import { db } from "../../config/firebase";
 import type {
   SearchListingsArgs,
   SearchLocalPlacesArgs,
@@ -14,24 +15,6 @@ import type {
 // ─────────────────────────────────────────────────────────────────────────────
 // Typed Interfaces
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface TypesenseHit {
-  id: string;
-  title: string;
-  price?: number;
-  location?: string;
-  domain?: string;
-  category?: string;
-  subCategory?: string;
-  description?: string;
-  metadata?: {
-    imageUrl?: string;
-    amenities?: string[];
-    rating?: number;
-    startsAt?: string;
-    endsAt?: string;
-  };
-}
 
 interface MapboxPlace {
   id: string;
@@ -61,6 +44,15 @@ interface SearchContext {
   marketId?: string;
 }
 
+interface SearchStaysArgs {
+  location?: string;
+  type?: string; // 'villa', 'apartment', 'daily', 'long-term'
+  minPrice?: number;
+  maxPrice?: number;
+  bedrooms?: number;
+  limit?: number;
+}
+
 interface SearchResult {
   id: string;
   title: string;
@@ -81,47 +73,79 @@ interface SearchResult {
 
 export const searchTools = {
   /**
-   * Search marketplace listings using TypeSense
+   * Search marketplace listings using Firestore directly
+   * For: Cars (rentals), Properties for SALE
+   * NOT for: Stay rentals (use searchStays instead)
    */
   searchMarketplace: async (args: SearchListingsArgs): Promise<any> => {
-    logger.debug("🔍 [Search] TypeSense Search Args:", args);
+    const startTime = Date.now();
+    logger.info("🔍 [SearchMarketplace] Query:", { args, timestamp: new Date().toISOString() });
 
     try {
-      // NOTE: Use `require()` instead of dynamic `import()` so Jest can mock this module
-      // and so unit tests don't require Node VM module flags.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { searchListings } = require("../typesense.service");
-      const result = await searchListings({
-        query: args.query || "*",
-        domain: args.domain,
-        category: args.category,
-        subCategory: args.subCategory,
-        location: args.location,
-        minPrice: args.minPrice,
-        maxPrice: args.maxPrice,
-        perPage: 20,
+      // Build Firestore query based on domain
+      let query = db.collection("listings").limit(args.limit || 20);
+
+      // Map domain to listing type
+      if (args.domain === "Cars" || args.domain?.toLowerCase().includes("car")) {
+        query = query.where("type", "==", "car");
+      } else if (args.domain === "Real Estate" || args.domain?.toLowerCase().includes("sale")) {
+        // Only properties for SALE, not rentals
+        query = query.where("type", "==", "property");
+        // If no subCategory, assume sale (since rentals should use searchStays)
+        if (!args.subCategory || args.subCategory === "sale") {
+          query = query.where("subCategory", "==", "sale");
+        }
+      }
+
+      const snapshot = await query.get();
+
+      // In-memory filtering for additional criteria
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title,
+          price: data.price,
+          currency: data.currency,
+          location: data.region || data.location,
+          domain: args.domain,
+          category: data.category,
+          subCategory: data.subCategory,
+          description: data.description,
+          imageUrl: data.images?.[0] || data.imageUrl,
+          amenities: data.amenities,
+          rating: data.rating,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+        };
       });
 
-      logger.debug(`🔍 [Search] Found ${result.found} items via TypeSense`);
+      // Apply filters in memory
+      if (args.location) {
+        results = results.filter(r =>
+          r.location?.toLowerCase().includes(args.location!.toLowerCase())
+        );
+      }
+      if (args.minPrice) {
+        results = results.filter(r => r.price >= args.minPrice!);
+      }
+      if (args.maxPrice) {
+        results = results.filter(r => r.price <= args.maxPrice!);
+      }
 
-      return result.hits.map((hit: TypesenseHit) => ({
-        id: hit.id,
-        title: hit.title,
-        price: hit.price,
-        location: hit.location,
-        domain: hit.domain,
-        category: hit.category,
-        subCategory: hit.subCategory,
-        description: hit.description,
-        imageUrl: hit.metadata?.imageUrl,
-        amenities: hit.metadata?.amenities,
-        rating: hit.metadata?.rating,
-      }));
+      logger.info(`✅ [SearchMarketplace] Complete`, {
+        queryArgs: args,
+        resultsCount: results.length,
+        durationMs: Date.now() - startTime,
+      });
+
+      return results;
     } catch (error: unknown) {
-      console.error("🔴 [Search] TypeSense Failed:", error);
+      logger.error("❌ [SearchMarketplace] Failed:", error);
       return [];
     }
   },
+
 
   /**
    * Search for local places using Mapbox
@@ -174,30 +198,47 @@ export const searchTools = {
   searchEvents: async (args: SearchEventsArgs): Promise<any> => {
     logger.debug("🔍 [Search] Events:", args);
 
+    // Use Firestore directly (Typesense temporarily disabled)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { searchListings } = require("../typesense.service");
-      const result = await searchListings({
-        query: args.query || "*",
-        domain: "Events",
-        location: args.location,
-        perPage: 20,
+      let query = db.collection("listings")
+        .where("domain", "==", "Events")
+        .limit(20);
+
+      const snapshot = await query.get();
+
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name || "Untitled",
+          price: data.price || 0,
+          location: data.region || data.location || data.address,
+          description: data.description,
+          imageUrl: Array.isArray(data.images) && data.images.length > 0 ? data.images[0] : data.imageUrl,
+          startsAt: data.startsAt || data.startTime,
+          endsAt: data.endsAt || data.endTime,
+        };
       });
 
-      logger.debug(`🔍 [Search Events] Found ${result.found} events`);
+      // Apply in-memory filters
+      if (args.location) {
+        const loc = args.location.toLowerCase();
+        results = results.filter((r: any) =>
+          (r.location || "").toLowerCase().includes(loc)
+        );
+      }
+      if (args.query) {
+        const q = args.query.toLowerCase();
+        results = results.filter((r: any) =>
+          (r.title || "").toLowerCase().includes(q) ||
+          (r.description || "").toLowerCase().includes(q)
+        );
+      }
 
-      return result.hits.map((hit: TypesenseHit) => ({
-        id: hit.id,
-        title: hit.title,
-        price: hit.price,
-        location: hit.location,
-        description: hit.description,
-        imageUrl: hit.metadata?.imageUrl,
-        startsAt: hit.metadata?.startsAt,
-        endsAt: hit.metadata?.endsAt,
-      }));
+      logger.info(`✅ [Search Events] Firestore returned ${results.length} events`);
+      return results;
     } catch (error: unknown) {
-      console.error("🔴 [Search Events] Failed:", error);
+      logger.error("🔴 [Search Events] Firestore query failed:", error);
       return [];
     }
   },
@@ -206,21 +247,68 @@ export const searchTools = {
    * Search specifically for housing
    */
   searchHousingListings: async (args: SearchHousingArgs, _ctx: SearchContext): Promise<unknown> => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/7207ff65-c9c6-4873-a824-51b8bedf5d3c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'search.tools.ts:249',message:'searchHousingListings ENTRY',data:{args,hasTypesenseCall:false,implementation:'Firestore-direct'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     logger.debug("🏠 [Search] Housing:", args);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { searchListings } = require("../typesense.service");
 
-    // Map args to searchListings params
-    return searchListings({
-      query: "*", // Default to all if no specific query
-      domain: "Real Estate", // or 'housing' depending on your index
-      category: "housing",
-      location: args.areaName, // Map areaName to location
-      minPrice: args.budgetMin,
-      maxPrice: args.budgetMax,
-      bedrooms: args.bedrooms,
-      perPage: 10,
-    });
+    // Use Firestore directly (Typesense temporarily disabled)
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/7207ff65-c9c6-4873-a824-51b8bedf5d3c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'search.tools.ts:253',message:'BEFORE Firestore query',data:{aboutToQuery:'listings collection'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    try {
+      let query = db.collection("listings")
+        .where("domain", "==", "Real Estate")
+        .where("category", "==", "housing")
+        .limit(10);
+
+      const snapshot = await query.get();
+
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name || "Untitled",
+          price: data.displayPrice || data.price,
+          location: data.region || data.address || data.location?.label,
+          domain: "Real Estate",
+          category: "housing",
+          subCategory: data.subcategory,
+          description: data.description,
+          imageUrl: Array.isArray(data.images) && data.images.length > 0 ? data.images[0] : null,
+          amenities: data.amenities || [],
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+        };
+      });
+
+      // Apply in-memory filters
+      if (args.areaName) {
+        const area = args.areaName.toLowerCase();
+        results = results.filter((r: any) =>
+          (r.location || "").toLowerCase().includes(area) ||
+          (r.title || "").toLowerCase().includes(area)
+        );
+      }
+      if (args.budgetMin) {
+        results = results.filter((r: any) => (r.price || 0) >= args.budgetMin!);
+      }
+      if (args.budgetMax) {
+        results = results.filter((r: any) => (r.price || Infinity) <= args.budgetMax!);
+      }
+      if (args.bedrooms) {
+        results = results.filter((r: any) => (r.bedrooms || 0) >= args.bedrooms!);
+      }
+
+      logger.info("✅ [SearchHousing] Firestore fallback returned", { count: results.length });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/7207ff65-c9c6-4873-a824-51b8bedf5d3c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'search.tools.ts:297',message:'searchHousingListings EXIT SUCCESS',data:{resultCount:results.length,usedFirestore:true,usedTypesense:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return results;
+    } catch (firestoreError: any) {
+      logger.error("🔴 [SearchHousing] Firestore fallback also failed:", firestoreError.message);
+      return []; // Return empty array instead of throwing
+    }
   },
 
   /**
@@ -228,31 +316,92 @@ export const searchTools = {
    */
   searchPlaces: async (args: SearchPlacesArgs, _ctx: SearchContext): Promise<unknown> => {
     logger.debug("📍 [Search] Curated Places:", args);
-    // Try Typesense first for curated places
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { searchListings } = require("../typesense.service");
-      const result = await searchListings({
-        query: args.tag || "*",
-        domain: "Places",
-        category: args.category,
-        perPage: args.limit || 10,
-      });
-
-      if (result.found > 0) {
-        return result.hits;
-      }
-    } catch (e) {
-      console.warn("TypeSense place search failed, falling back to Mapbox", e);
-    }
-
-    // Fallback to Mapbox if no curated places found
+    // Use Mapbox directly (Typesense temporarily disabled)
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { searchMapboxPlaces } = require("../mapbox.service");
-    const query = `${args.category || ""} ${args.tag || ""}`;
+    const query = `${args.category || ""} ${args.tag || ""}`.trim();
     return searchMapboxPlaces(query, {
       types: "poi",
       limit: args.limit || 10,
     });
+  },
+
+  /**
+   * Search stays/rentals directly from Firestore
+   * Supports daily rentals, villas, apartments
+   * Uses direct Firestore query for reliability (no Typesense sync needed)
+   */
+  searchStays: async (args: SearchStaysArgs, _ctx?: SearchContext): Promise<unknown[]> => {
+    const startTime = Date.now();
+    logger.info("🏠 [SearchStays] Query:", { args, timestamp: new Date().toISOString() });
+
+    try {
+      // Query listings with type = 'stay' (matches UnifiedListing.type)
+      const query = db.collection("listings")
+        .where("type", "==", "stay")
+        .limit(args.limit || 20);
+
+      const snapshot = await query.get();
+
+      // Filter in memory for additional criteria
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name || "Untitled",
+          price: data.displayPrice || data.price,
+          location: data.region || data.address || (data.location?.label),
+          domain: "Stays",
+          category: data.category,
+          subCategory: data.subcategory || data.category,
+          description: data.description,
+          imageUrl: Array.isArray(data.images) && data.images.length > 0 ? data.images[0] : null,
+          amenities: data.amenities || [],
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          rating: data.rating,
+        };
+      });
+
+      // Apply filters
+      if (args.location) {
+        const loc = args.location.toLowerCase();
+        results = results.filter((r: any) =>
+          (r.location || "").toLowerCase().includes(loc)
+        );
+      }
+
+      if (args.type) {
+        const t = args.type.toLowerCase();
+        results = results.filter((r: any) =>
+          (r.category || "").toLowerCase().includes(t) ||
+          (r.subCategory || "").toLowerCase().includes(t)
+        );
+      }
+
+      if (args.minPrice) {
+        results = results.filter((r: any) => (r.price || 0) >= args.minPrice!);
+      }
+      if (args.maxPrice) {
+        results = results.filter((r: any) => (r.price || Infinity) <= args.maxPrice!);
+      }
+      if (args.bedrooms) {
+        results = results.filter((r: any) => (r.bedrooms || 0) >= args.bedrooms!);
+      }
+
+      // Audit log
+      const durationMs = Date.now() - startTime;
+      logger.info("✅ [SearchStays] Complete", {
+        queryArgs: args,
+        resultsCount: results.length,
+        durationMs,
+        timestamp: new Date().toISOString(),
+      });
+
+      return results;
+    } catch (error) {
+      logger.error("🔴 [SearchStays] Failed:", error);
+      return [];
+    }
   },
 };

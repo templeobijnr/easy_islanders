@@ -1,15 +1,24 @@
 
 import { db } from '../firebaseConfig';
-import { collection, getDocs, doc, setDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, orderBy, where } from 'firebase/firestore';
 import { Booking } from '../../types';
 import { sanitizeData } from './utils';
+import { auth } from '../firebaseConfig';
 
 const COLLECTION = 'bookings';
 
 export const BookingStorage = {
   getUserBookings: async (): Promise<Booking[]> => {
     try {
-      const q = query(collection(db, COLLECTION), orderBy('date', 'desc'));
+      const uid = auth.currentUser?.uid;
+      if (!uid) return [];
+      // Firestore rules require user to read only their own bookings.
+      // See `firestore.rules` match /bookings: allow read if resource.data.userId == request.auth.uid (or isAdmin()).
+      const q = query(
+        collection(db, COLLECTION),
+        where('userId', '==', uid),
+        orderBy('date', 'desc'),
+      );
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => doc.data() as Booking);
     } catch (error) {

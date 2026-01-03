@@ -17,6 +17,7 @@ import {
 import { router } from 'expo-router';
 import { getCurrentLocation, Coordinates } from '../../services/locationService';
 import { logger } from '../../utils/logger';
+import { getFeed, getLiveVenues, type LiveVenue, type UserActivity } from '../../services/api/connectApi';
 // Import platform-specific MapView (uses .web.tsx on web, .native.tsx on native)
 import MapView from '../../components/Map/MapView';
 import type { MapRegion } from '../../components/Map';
@@ -29,48 +30,22 @@ const NORTH_CYPRUS_REGION: MapRegion = {
     longitudeDelta: 0.5,
 };
 
-// Mock markers - Replace with API data
-const MOCK_MARKERS = [
-    {
-        id: '1',
-        title: 'Kyrenia Castle',
-        category: 'Tourism',
-        coordinate: { latitude: 35.3413, longitude: 33.3192 },
-    },
-    {
-        id: '2',
-        title: 'Bellapais Abbey',
-        category: 'History',
-        coordinate: { latitude: 35.3, longitude: 33.35 },
-    },
-    {
-        id: '3',
-        title: 'St. Hilarion Castle',
-        category: 'Tourism',
-        coordinate: { latitude: 35.31, longitude: 33.28 },
-    },
-    {
-        id: '4',
-        title: 'Palm Beach',
-        category: 'Beach',
-        coordinate: { latitude: 35.19, longitude: 33.83 },
-    },
-    {
-        id: '5',
-        title: 'Salamis Ruins',
-        category: 'History',
-        coordinate: { latitude: 35.18, longitude: 33.9 },
-    },
-];
-
-// Mock feed items
-const MOCK_FEED = [
-    { id: '1', type: 'event', title: 'Beach Cleanup', location: 'Palm Beach', time: 'Today, 3 PM' },
-    { id: '2', type: 'activity', title: 'Hiking Group', location: 'St. Hilarion', time: 'Tomorrow, 9 AM' },
-    { id: '3', type: 'event', title: 'Food Festival', location: 'Kyrenia Harbor', time: 'This Weekend' },
-];
-
 type ViewMode = 'map' | 'feed';
+
+type Marker = {
+    id: string;
+    title: string;
+    category: string;
+    coordinate: { latitude: number; longitude: number };
+};
+
+type FeedItem = {
+    id: string;
+    type: string;
+    title: string;
+    location: string;
+    time: string;
+};
 
 export default function ConnectScreen() {
     const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -78,12 +53,16 @@ export default function ConnectScreen() {
     const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
     const [loading, setLoading] = useState(true);
     const mapRef = useRef<any>(null);
+    const [markers, setMarkers] = useState<Marker[]>([]);
+    const [feed, setFeed] = useState<FeedItem[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     const isMapView = viewMode === 'map';
     const isFeedView = viewMode === 'feed';
 
     useEffect(() => {
         loadUserLocation();
+        loadConnectData();
     }, []);
 
     async function loadUserLocation() {
@@ -98,6 +77,41 @@ export default function ConnectScreen() {
             logger.error('Failed to load user location', error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function loadConnectData() {
+        setError(null);
+        try {
+            const [venues, feedResp] = await Promise.all([
+                getLiveVenues(), // region optional for v1
+                getFeed({ limit: 50 }),
+            ]);
+
+            // Map venues -> markers expected by MapView
+            const nextMarkers: Marker[] = venues
+                .filter((v) => typeof v.lat === 'number' && typeof v.lng === 'number')
+                .map((v) => ({
+                    id: v.id,
+                    title: v.title,
+                    category: v.pinType,
+                    coordinate: { latitude: v.lat!, longitude: v.lng! },
+                }));
+
+            setMarkers(nextMarkers);
+
+            const nextFeed: FeedItem[] = feedResp.items.map((item) => ({
+                id: item.id,
+                type: item.type,
+                title: item.pinTitle || item.type,
+                location: item.pinId,
+                time: new Date(item.createdAt).toLocaleString(),
+            }));
+
+            setFeed(nextFeed);
+        } catch (e) {
+            logger.error('Failed to load connect data', e);
+            setError('Failed to load connect data');
         }
     }
 
@@ -124,7 +138,7 @@ export default function ConnectScreen() {
                     initialRegion={NORTH_CYPRUS_REGION}
                     region={region}
                     onRegionChange={setRegion}
-                    markers={MOCK_MARKERS}
+                    markers={markers}
                     onMarkerPress={handleMarkerPress}
                     loading={loading}
                     onSwitchToFeed={() => setViewMode('feed')}
@@ -169,10 +183,11 @@ export default function ConnectScreen() {
         <View style={styles.container}>
             <View style={styles.feedHeader}>
                 <Text style={styles.feedTitle}>Community</Text>
+                {error && <Text style={{ color: '#d32f2f', marginTop: 6 }}>{error}</Text>}
             </View>
 
             <ScrollView style={styles.feedList} contentContainerStyle={styles.feedContent}>
-                {MOCK_FEED.map((item) => (
+                {feed.map((item) => (
                     <TouchableOpacity key={item.id} style={styles.feedCard} activeOpacity={0.7}>
                         <View style={styles.feedCardBadge}>
                             <Text style={styles.feedCardBadgeText}>

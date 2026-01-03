@@ -5,10 +5,10 @@
  */
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, Timestamp, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/services/firebaseConfig";
-import { DEFAULT_FORM_DATA } from "@/components/admin/CatalogManager/sections/ItemForm";
-import type { ItemFormData } from "@/components/admin/CatalogManager/sections/ItemForm";
-import type { ListingDataItem } from "@/components/admin/CatalogManager/sections/ItemsList";
+import { db } from "../../../../../../services/firebaseConfig";
+import { DEFAULT_FORM_DATA } from "../../ItemForm";
+import type { ItemFormData } from "../../ItemForm";
+import type { ListingDataItem } from "../ItemsList";
 import type { IngestKind, IngestProposal, ExtractionStatus } from "../types";
 import { CATEGORY_PRESETS } from "../constants";
 import { createIngestJobFromUrl as apiCreateUrl, createIngestJobFromFile as apiCreateFile, applyProposal as apiApply, rejectProposal as apiReject } from "./ingestApi";

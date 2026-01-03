@@ -51,11 +51,35 @@ export const DEFAULT_TEMPLATES: Partial<Record<MerveActionType, string>> = {
     inquire: `💬 General Inquiry\n\nFrom: {customerName}\nPhone: {customerPhone}\n\nMessage: {message}`,
 };
 
+/** Map action types to their suggested data kind */
+export const ACTION_DATA_KINDS: Partial<Record<MerveActionType, IngestKind>> = {
+    order_food: "menuItems",
+    book_stay: "roomTypes",
+    request_service: "services",
+    book_activity: "offerings",
+    order_supplies: "offerings",
+    register_event: "tickets",
+};
+
+/** 
+ * Get default ingest kinds for a place type.
+ * Single source of truth - use this instead of inline switch statements.
+ */
+export const getDefaultKindsForPlaceType = (placeType: MervePlaceType): IngestKind[] => {
+    const actions = DEFAULT_ACTIONS_BY_TYPE[placeType] || [];
+    const primaryAction = actions[0];
+    if (primaryAction && ACTION_DATA_KINDS[primaryAction]) {
+        return [ACTION_DATA_KINDS[primaryAction]];
+    }
+    return ["offerings"];
+};
+
+/** Ingest kind labels for display - values must match OfferingsManager types */
 export const INGEST_KIND_OPTIONS: { value: IngestKind | ""; label: string }[] = [
     { value: "", label: "None" },
-    { value: "offerings", label: "Offerings" },
-    { value: "menu", label: "Menu" },
-    { value: "rooms", label: "Rooms" },
+    { value: "menuItems", label: "Menu for this place" },
+    { value: "roomTypes", label: "Room Types" },
     { value: "services", label: "Services" },
-    { value: "schedule", label: "Schedule" },
+    { value: "offerings", label: "Offerings" },
+    { value: "tickets", label: "Tickets" },
 ];

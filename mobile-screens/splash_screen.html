@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EasyIslanders Splash Screen</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#135bec",
+              "background-light": "#f6f6f8",
+              "background-dark": "#101622",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            boxShadow: {
+                "glow": "0 0 40px -5px rgba(19, 91, 236, 0.5)",
+            }
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased overflow-hidden selection:bg-primary selection:text-white">
+<div class="relative flex h-screen w-full flex-col items-center justify-between overflow-hidden">
+<div class="absolute inset-0 z-0">
+<img alt="City view of Kyrenia" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbKFnTcrpnZQNArqbY6wsUshZpA4ROOKR6ysbJkQvahiRXebDXAD4rO0rmmsYQvpatlEgAcFI2p-ADf32gVDrKId7AQjMABQXHQ3Cx7RLbSaZyPMG2zGppKbfrO_oF5PyVTZelmClqqObpgxdkBEASgU--Yb9iAsp2-or5mqjeLOSP2-Lksv-mPfsbodhFfjetVUBgAAycKu3Phs1tLZAlnwngOwUthZnfWYA-WFFzYEKfuww-kW4XhB2JoW3YsFQpInD0c5SB5x73"/>
+<div class="absolute inset-0 bg-background-dark/60 dark:bg-background-dark/80 backdrop-blur-[2px]"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark via-transparent to-background-dark/20"></div>
+</div>
+<div class="absolute inset-0 pointer-events-none flex items-center justify-center z-0">
+<div class="w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px]"></div>
+</div>
+<div class="flex-1"></div>
+<div class="z-10 flex flex-col items-center justify-center w-full px-6">
+<div class="mb-8 relative group">
+<div class="absolute inset-0 bg-primary/40 blur-xl rounded-full transform scale-75 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+<div class="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-[#0f4bc9] flex items-center justify-center shadow-glow shadow-primary/30 ring-2 ring-white/20">
+<span class="material-symbols-outlined text-white text-[44px]">
+                        location_city
+                    </span>
+</div>
+</div>
+<div class="flex flex-col items-center text-center space-y-3">
+<h1 class="text-white tracking-tight text-3xl font-bold leading-tight drop-shadow-md">
+                EasyIslanders
+            </h1>
+<p class="text-slate-200/90 text-base font-normal drop-shadow-sm">
+                Your city, now interactive.
+            </p>
+</div>
+</div>
+<div class="flex-1 flex flex-col justify-end w-full pb-12 px-12 z-10">
+<div class="flex flex-col items-center gap-3">
+<div class="w-full max-w-[160px] h-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+<div class="h-full bg-primary rounded-full w-[45%]"></div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>

@@ -26,4 +26,14 @@
   animation: float 6s ease-in-out infinite;
 }
 
+/* Mapbox Markers */
+.marker {
+  display: block;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+
+
 

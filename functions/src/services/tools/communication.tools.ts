@@ -9,6 +9,7 @@ import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
 import type { SendWhatsAppArgs } from "../../types/tools";
 import { db } from "../../config/firebase";
+import { DispatchService } from "../domains/dispatch/dispatch.service";
 
 const now = FieldValue.serverTimestamp;
 
@@ -26,8 +27,14 @@ export const communicationTools = {
     logger.debug("📱 [WhatsApp] Sending message:", args);
 
     try {
-      const { sendWhatsApp } = await import("../twilio.service");
-      const res = await sendWhatsApp(args.recipient, args.message);
+      const dispatch = await DispatchService.sendWhatsApp({
+        kind: "user_notification",
+        toE164: args.recipient,
+        body: args.message,
+        correlationId: `tool:sendWhatsAppMessage:${args.userId || "unknown"}`,
+        idempotencyKey: `tool_whatsapp:${args.userId || "unknown"}:${args.recipient}:${Date.now()}`,
+        traceId: `tool-${Date.now()}`,
+      });
 
       // Log notification to database
       await db.collection("notifications").add({
@@ -35,14 +42,14 @@ export const communicationTools = {
         channel: "whatsapp",
         message: args.message,
         to: args.recipient,
-        status: res.status || "sent",
+        status: "sent",
         createdAt: now(),
       });
 
       return {
         success: true,
-        status: res.status,
-        sid: res.sid,
+        status: "sent",
+        sid: dispatch.providerMessageId,
       };
     } catch (err: unknown) {
       console.error("🔴 [WhatsApp] Failed:", err);

@@ -52,7 +52,7 @@ export const extractTextFromImage = async (
     mimeType: string
 ): Promise<string> => {
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
 
     try {
         const result = await model.generateContent([
@@ -294,7 +294,7 @@ export const extractProductsFromKnowledge = async (
     texts: string[]
 ): Promise<{ name: string; price: number; currency: string; category: string; description: string }[]> => {
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
 
     const combinedText = texts.join("\n---\n");
 

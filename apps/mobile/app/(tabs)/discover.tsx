@@ -20,71 +20,16 @@ import {
     formatDistance,
     Coordinates,
 } from '../../services/locationService';
+import { getListings, type Listing } from '../../services/api/catalogApi';
 import { logger } from '../../utils/logger';
 
-// Mock data - Replace with API call when backend ready
-const MOCK_LISTINGS = [
-    {
-        id: '1',
-        title: 'Bellapais Abbey',
-        category: 'Tourism',
-        lat: 35.3,
-        lng: 33.35,
-        description: 'Historic 12th-century monastery with stunning views',
-        image: 'https://via.placeholder.com/300x200',
-    },
-    {
-        id: '2',
-        title: 'Kyrenia Harbor',
-        category: 'Tourism',
-        lat: 35.34,
-        lng: 33.32,
-        description: 'Scenic Mediterranean harbor with restaurants',
-        image: 'https://via.placeholder.com/300x200',
-    },
-    {
-        id: '3',
-        title: 'St. Hilarion Castle',
-        category: 'Tourism',
-        lat: 35.31,
-        lng: 33.28,
-        description: 'Medieval castle perched on mountain peaks',
-        image: 'https://via.placeholder.com/300x200',
-    },
-    {
-        id: '4',
-        title: 'Palm Beach',
-        category: 'Beach',
-        lat: 35.19,
-        lng: 33.83,
-        description: 'Beautiful sandy beach in Famagusta',
-        image: 'https://via.placeholder.com/300x200',
-    },
-    {
-        id: '5',
-        title: 'Salamis Ruins',
-        category: 'History',
-        lat: 35.18,
-        lng: 33.9,
-        description: 'Ancient Greco-Roman ruins near Famagusta',
-        image: 'https://via.placeholder.com/300x200',
-    },
-];
-
-interface ListingWithDistance {
-    id: string;
-    title: string;
-    category: string;
-    lat: number;
-    lng: number;
-    description: string;
-    image: string;
+interface ListingWithDistance extends Listing {
     distance?: number;
 }
 
 export default function DiscoverScreen() {
     const [location, setLocation] = useState<Coordinates | null>(null);
-    const [listings, setListings] = useState<ListingWithDistance[]>(MOCK_LISTINGS);
+    const [listings, setListings] = useState<ListingWithDistance[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -98,35 +43,35 @@ export default function DiscoverScreen() {
         setError(null);
 
         try {
+            // Fetch listings from API
+            const response = await getListings({ approved: true, limit: 50 });
+            const apiListings = response.listings;
+
+            // Try to get user location for distance sorting
             const coords = await getCurrentLocation();
 
-            if (!coords) {
+            if (coords) {
+                setLocation(coords);
+                logger.log('User location:', coords);
+
+                // Calculate distances and sort
+                const listingsWithDistance = apiListings
+                    .filter((listing) => listing.lat && listing.lng)
+                    .map((listing) => ({
+                        ...listing,
+                        distance: calculateDistance(coords, {
+                            latitude: listing.lat!,
+                            longitude: listing.lng!,
+                        }),
+                    }))
+                    .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+                setListings(listingsWithDistance);
+            } else {
+                // No location - show listings without distance
                 setError('Location permission required for "Near Me"');
-                // Still show listings, just without distances
-                setListings(MOCK_LISTINGS);
-                return;
+                setListings(apiListings);
             }
-
-            setLocation(coords);
-            logger.log('User location:', coords);
-
-            // Calculate distances and sort
-            const listingsWithDistance = MOCK_LISTINGS.map((listing) => ({
-                ...listing,
-                distance: calculateDistance(coords, {
-                    latitude: listing.lat,
-                    longitude: listing.lng,
-                }),
-            })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-            setListings(listingsWithDistance);
-
-            // TODO: Replace with actual API call
-            // const response = await fetch(
-            //   `${API_URL}/v1/listings/nearby?lat=${coords.latitude}&lng=${coords.longitude}&radius=50`
-            // );
-            // const data = await response.json();
-            // setListings(data.listings);
         } catch (err) {
             logger.error('Failed to load nearby listings', err);
             setError('Failed to load nearby places');

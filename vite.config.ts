@@ -9,6 +9,15 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
+      // Parity-first: proxy /v1/* to the deployed gateway so localhost doesn't get Vite's HTML fallback.
+      // This prevents "Unexpected token '<' ... not valid JSON" when code expects JSON from API routes.
+      proxy: {
+        '/v1': {
+          target: 'https://easyislanders.com',
+          changeOrigin: true,
+          secure: true,
+        },
+      },
     },
     plugins: [react()],
     define: {

@@ -177,7 +177,7 @@ Generate a friendly, enthusiastic message to inform the user that their taxi has
 
     const model = client.getGenerativeModel(
       {
-        model: process.env.GEMINI_MODEL || "gemini-2.0-flash-exp",
+        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
         systemInstruction: systemPrompt,
       },
       { apiVersion: "v1beta" },

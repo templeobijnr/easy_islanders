@@ -1,10 +1,11 @@
 /**
- * ActionRow - Single action configuration row
+ * ActionRow - Single action configuration row with inline data management
  */
-import React, { useState } from "react";
-import { Check, ChevronDown, MessageCircle, ChevronRight } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Check, ChevronDown, MessageCircle, ChevronRight, Database } from "lucide-react";
 import type { MerveAction, MerveActionType, IngestKind } from "../types";
-import { ACTION_METADATA, INGEST_KIND_OPTIONS, DEFAULT_TEMPLATES } from "../constants";
+import { ACTION_METADATA, INGEST_KIND_OPTIONS, DEFAULT_TEMPLATES, ACTION_DATA_KINDS } from "../constants";
+import OfferingsManager from "../../OfferingsManager";
 
 interface ActionRowProps {
     actionType: MerveActionType;
@@ -15,6 +16,10 @@ interface ActionRowProps {
     onWhatsAppChange: (toE164: string) => void;
     onDataKindChange: (kind: IngestKind | "") => void;
     onDataRequiredChange: (required: boolean) => void;
+    /** Listing ID to enable inline data management */
+    listingId?: string;
+    /** Market ID for data operations */
+    marketId?: string;
 }
 
 const ActionRow: React.FC<ActionRowProps> = ({
@@ -26,9 +31,32 @@ const ActionRow: React.FC<ActionRowProps> = ({
     onWhatsAppChange,
     onDataKindChange,
     onDataRequiredChange,
+    listingId,
+    marketId,
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const meta = ACTION_METADATA[actionType];
+
+    // Track if we've already auto-set the data kind for this action
+    const autoSetRef = useRef(false);
+
+    // Auto-select data kind based on action type when first enabled
+    // Use ref to prevent infinite loops and only trigger once per enable
+    useEffect(() => {
+        if (isEnabled && !action?.data?.kind && !autoSetRef.current) {
+            const suggestedKind = ACTION_DATA_KINDS[actionType];
+            if (suggestedKind) {
+                autoSetRef.current = true;
+                onDataKindChange(suggestedKind);
+            }
+        }
+        // Reset ref when action is disabled
+        if (!isEnabled) {
+            autoSetRef.current = false;
+        }
+    }, [isEnabled, actionType, action?.data?.kind, onDataKindChange]);
+
+    const selectedKind = action?.data?.kind || "";
 
     return (
         <div className={`border rounded-xl overflow-hidden transition-all ${isEnabled ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200"}`}>
@@ -51,7 +79,7 @@ const ActionRow: React.FC<ActionRowProps> = ({
 
             {/* Expanded Config */}
             {isEnabled && isExpanded && (
-                <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-3">
+                <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-4">
                     {/* WhatsApp Number */}
                     <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">WhatsApp Number (optional override)</label>
@@ -67,26 +95,46 @@ const ActionRow: React.FC<ActionRowProps> = ({
                         </div>
                     </div>
 
-                    {/* Data Kind */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Data Source</label>
+                    {/* Data Kind Selection */}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+                            <Database size={12} /> Data Source
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
                             <select
-                                value={action?.data?.kind || ""}
+                                value={selectedKind}
                                 onChange={(e) => onDataKindChange(e.target.value as IngestKind | "")}
                                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                                 {INGEST_KIND_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Required</label>
-                            <label className="flex items-center gap-2 h-[38px]">
+                            <label className="flex items-center gap-2">
                                 <input type="checkbox" checked={action?.data?.required || false} onChange={(e) => onDataRequiredChange(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-500" />
-                                <span className="text-sm text-slate-600">Data required</span>
+                                <span className="text-sm text-slate-600">Required</span>
                             </label>
                         </div>
                     </div>
+
+                    {/* Inline Data Management - Only show when data source is selected and listingId available */}
+                    {selectedKind && listingId && (
+                        <div className="bg-slate-900 rounded-xl p-4 -mx-1">
+                            <OfferingsManager
+                                listingId={listingId}
+                                listingTitle=""
+                                marketId={marketId || "nc"}
+                                kinds={[selectedKind]}
+                                variant="inline"
+                                actionLabel={meta.label}
+                            />
+                        </div>
+                    )}
+
+                    {/* Help text when no listingId */}
+                    {selectedKind && !listingId && (
+                        <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+                            💡 Save this listing first to enable data import
+                        </div>
+                    )}
 
                     {/* Template */}
                     <div>

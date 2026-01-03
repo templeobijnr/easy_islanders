@@ -67,8 +67,9 @@ const DEFAULT_CONFIG: Omit<MerveConfig, 'marketId' | 'updatedAt'> = {
         // ──────────────────────────────────────────────────────────────────
         // Core discovery / read tools (enabled by default)
         // ──────────────────────────────────────────────────────────────────
+        // DEPRECATED: searchMarketplace disabled - use searchStays instead
         searchMarketplace: {
-            enabled: true,
+            enabled: false,
             defaultTemplate: '',
         },
         searchLocalPlaces: {

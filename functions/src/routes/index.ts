@@ -10,6 +10,7 @@ import {
   importListingFromUrl,
   updateListing,
 } from "../controllers/listing.controller";
+import { getListingImages } from "../controllers/listingImages.controller";
 import { getErrorMessage } from "../utils/errors";
 import { importPropertyFromUrl } from "../controllers/import.controller";
 import { Request, Response } from "express";
@@ -45,6 +46,7 @@ router.put("/listings/:id", isAuthenticated, updateListing);
 router.delete("/listings/:id", isAuthenticated, deleteListing);
 router.get("/listings", isAuthenticated, getUserListings);
 router.get("/listings/:id", getListingById); // Public endpoint
+router.get("/listings/:id/images", getListingImages); // Public endpoint (read-only)
 
 // Listings Import
 router.post("/listings/import", isAuthenticated, importListingFromUrl);
@@ -135,258 +137,11 @@ router.post("/whatsapp/taxi-request", async (req: Request, res: Response) => {
 });
 
 // WhatsApp inbound webhook (Twilio)
-router.post("/whatsapp/webhook", async (req: Request, res: Response) => {
-  try {
-    const { From, Body, To, MessageSid } = req.body;
-    const from = (From || "").replace("whatsapp:", "");
-    const text = Body || "";
-
-    logger.debug("📨 [WhatsApp Webhook] Received message:", {
-      from,
-      to: To,
-      text,
-    });
-
-    // Persist inbound message
-    const messageRef = await db.collection("whatsappMessages").add({
-      from: From,
-      to: To,
-      body: text,
-      direction: "inbound",
-      messageSid: MessageSid,
-      receivedAt: new Date().toISOString(),
-    });
-
-    // VENDOR REPLY INTERCEPTOR: Check if this is a vendor responding to an order
-    const { handleVendorReply } =
-      await import("../services/vendorReply.service");
-    const isVendorReply = await handleVendorReply(From, text);
-
-    if (isVendorReply) {
-      // This was a vendor reply - we've handled it, don't process as user chat
-      logger.debug("✅ [WhatsApp Webhook] Message handled as vendor reply");
-      res.status(200).send("OK");
-      return;
-    }
-
-    // If not a vendor reply, continue with normal processing
-    logger.debug("ℹ️ [WhatsApp Webhook] Processing as user message");
-    const textLower = text.toLowerCase();
-
-    // Handle taxi booking responses
-    if (
-      textLower.includes("taxi") ||
-      textLower.includes("driver") ||
-      textLower.includes("pickup")
-    ) {
-      const taxiBookings = await db
-        .collection("taxiBookings")
-        .where("status", "==", "pending")
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-
-      for (const bookingDoc of taxiBookings.docs) {
-        const booking = bookingDoc.data();
-        const isConfirmed =
-          textLower.includes("confirm") ||
-          textLower.includes("accept") ||
-          textLower.includes("on my way");
-
-        // Update the most recent pending booking
-        await bookingDoc.ref.update({
-          status: isConfirmed ? "confirmed" : "updated",
-          driverResponse: text,
-          driverPhone: from,
-          respondedAt: new Date().toISOString(),
-        });
-        logger.debug(
-          `✅ Updated taxi booking ${bookingDoc.id} with driver response`,
-        );
-
-        // Trigger agent to notify the user
-        if (booking.userId) {
-          const userSessionId = `session_${booking.userId}_agent_default`;
-          const notificationMessage = isConfirmed
-            ? `Great news! Your taxi booking has been confirmed. The driver says: "${text}". They should arrive at ${booking.pickupLocation} soon!`
-            : `Update on your taxi booking: ${text}`;
-
-          // Add system message to user's chat session
-          await db
-            .collection("chatSessions")
-            .doc(userSessionId)
-            .collection("messages")
-            .add({
-              role: "model",
-              parts: [{ text: notificationMessage }],
-              userId: booking.userId,
-              agentId: "agent_default",
-              timestamp: new Date().toISOString(),
-              source: "system_notification",
-              bookingId: bookingDoc.id,
-            });
-
-          // Update session's last message time
-          await db.collection("chatSessions").doc(userSessionId).set(
-            {
-              lastMessageAt: new Date().toISOString(),
-            },
-            { merge: true },
-          );
-
-          // Send WhatsApp to user if they have a phone number
-          if (booking.customerContact) {
-            try {
-              const { sendWhatsApp } =
-                await import("../services/twilio.service");
-              await sendWhatsApp(booking.customerContact, notificationMessage);
-              logger.debug(
-                `📱 Sent WhatsApp notification to user ${booking.userId}`,
-              );
-            } catch (err) {
-              console.error("⚠️ Failed to send WhatsApp to user:", err);
-            }
-          }
-
-          logger.debug(
-            `🔔 Notified user ${booking.userId} about taxi booking update`,
-          );
-        }
-
-        break; // Only update the first (most recent) one
-      }
-    }
-
-    // Handle viewing request responses
-    if (
-      textLower.includes("viewing") ||
-      textLower.includes("property") ||
-      textLower.includes("apartment")
-    ) {
-      const viewingRequests = await db
-        .collection("viewingRequests")
-        .where("status", "==", "pending")
-        .where("listingOwnerContact", "==", from)
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-
-      for (const viewingDoc of viewingRequests.docs) {
-        const viewing = viewingDoc.data();
-        const isConfirmed =
-          textLower.includes("confirm") ||
-          textLower.includes("accept") ||
-          textLower.includes("yes");
-
-        await viewingDoc.ref.update({
-          status: isConfirmed ? "confirmed" : "updated",
-          ownerResponse: text,
-          respondedAt: new Date().toISOString(),
-        });
-        logger.debug(
-          `✅ Updated viewing request ${viewingDoc.id} with owner response`,
-        );
-
-        // Trigger agent to notify the user
-        if (viewing.userId) {
-          const userSessionId = `session_${viewing.userId}_agent_default`;
-          const notificationMessage = isConfirmed
-            ? `Excellent! Your viewing request for "${viewing.listingTitle}" has been confirmed. The owner says: "${text}". Viewing scheduled for ${viewing.preferredSlot}.`
-            : `Update on your viewing request for "${viewing.listingTitle}": ${text}`;
-
-          // Add system message to user's chat session
-          await db
-            .collection("chatSessions")
-            .doc(userSessionId)
-            .collection("messages")
-            .add({
-              role: "model",
-              parts: [{ text: notificationMessage }],
-              userId: viewing.userId,
-              agentId: "agent_default",
-              timestamp: new Date().toISOString(),
-              source: "system_notification",
-              viewingRequestId: viewingDoc.id,
-            });
-
-          // Update session's last message time
-          await db.collection("chatSessions").doc(userSessionId).set(
-            {
-              lastMessageAt: new Date().toISOString(),
-            },
-            { merge: true },
-          );
-
-          // Send WhatsApp to user if they have a phone number
-          if (viewing.customerContact) {
-            try {
-              const { sendWhatsApp } =
-                await import("../services/twilio.service");
-              await sendWhatsApp(viewing.customerContact, notificationMessage);
-              logger.debug(
-                `📱 Sent WhatsApp notification to user ${viewing.userId}`,
-              );
-            } catch (err) {
-              console.error("⚠️ Failed to send WhatsApp to user:", err);
-            }
-          }
-
-          logger.debug(
-            `🔔 Notified user ${viewing.userId} about viewing request update`,
-          );
-        }
-
-        break;
-      }
-    }
-
-    // Attempt to map to user/session (fallback session per phone)
-    let userId: string | null = null;
-    const userSnap = await db
-      .collection("users")
-      .where("phoneNumber", "==", from)
-      .limit(1)
-      .get();
-    if (!userSnap.empty) {
-      userId = userSnap.docs[0].id;
-    }
-    const sessionId = userId ? `whatsapp_${userId}` : `whatsapp_${from}`;
-
-    // Write into chat session so it appears in UI
-    await db
-      .collection("chatSessions")
-      .doc(sessionId)
-      .set(
-        {
-          id: sessionId,
-          userId: userId || null,
-          agentId: "agent_whatsapp",
-          createdAt: new Date().toISOString(),
-          lastMessageAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
-
-    await db
-      .collection("chatSessions")
-      .doc(sessionId)
-      .collection("messages")
-      .add({
-        role: "model",
-        parts: [{ text }],
-        userId: userId || null,
-        agentId: "agent_whatsapp",
-        timestamp: new Date().toISOString(),
-        source: "whatsapp",
-        whatsappMessageId: messageRef.id,
-      });
-
-    // Acknowledge immediately to Twilio
-    res.status(200).send("OK");
-  } catch (err: unknown) {
-    console.error("❌ [WhatsApp webhook] Error:", err);
-    res.status(500).send("ERROR");
-  }
+router.post("/whatsapp/webhook", (_req: Request, res: Response) => {
+  // IMPORTANT: This legacy WhatsApp webhook is intentionally disabled.
+  // Canonical WhatsApp ingress must use the signed FAST-ACK Twilio controller
+  // + async task worker (threads/* + unified orchestrator).
+  res.status(410).send("Deprecated. Use the signed Twilio WhatsApp webhook endpoint.");
 });
 
 // Database Population (Admin only)
@@ -516,6 +271,268 @@ router.delete(
 // Health Check
 router.get("/health", (req, res) => {
   res.json({ status: "online", timestamp: new Date().toISOString() });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOBILE API ROUTES (v1)
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { CatalogController } from "../modules/catalog/catalog.controller";
+import { ConnectController } from "../modules/connect/connect.controller";
+import { NotificationsService } from "../modules/notifications/notifications.service";
+import type { AuthContext } from "../modules/identity/identity.schema";
+
+// Helper: Convert Express req.user to AuthContext
+function toAuthContext(user: Express.Request["user"]): AuthContext {
+  if (!user) throw new Error("No user in request");
+  return {
+    uid: user.uid,
+    email: user.email,
+    role: user.role === "admin" ? "admin" : user.role === "business" ? "provider" : "user",
+    isAdmin: user.role === "admin",
+  };
+}
+
+// Helper: Standard error response
+function sendError(res: Response, code: string, message: string, status: number, traceId?: string) {
+  res.status(status).json({
+    error: {
+      code,
+      message,
+      traceId: traceId || `trace-${Date.now()}`,
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1) CATALOG LISTINGS
+// GET /v1/catalog/listings?type=&region=&category=&approved=&limit=
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTE: This router is mounted at `/v1` in `functions/src/app.ts`.
+// Define paths WITHOUT the `/v1` prefix here.
+router.get("/catalog/listings", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const ctx = toAuthContext(req.user);
+    const allowedTypes = new Set(["place", "activity", "event", "stay", "experience"] as const);
+    const rawType = req.query.type as string | undefined;
+    const type = rawType && allowedTypes.has(rawType as any) ? (rawType as any) : undefined;
+    const query = {
+      type,
+      region: req.query.region as string | undefined,
+      category: req.query.category as string | undefined,
+      approved: req.query.approved === "true" ? true : req.query.approved === "false" ? false : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+    };
+
+    const listings = await CatalogController.getListings(ctx, query);
+    res.json({
+      listings,
+      total: listings.length,
+      hasMore: false,
+      cursor: null,
+    });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    const code = error.code || "INTERNAL_ERROR";
+    const message = error.message || "Failed to fetch listings";
+    const status = code === "PERMISSION_DENIED" ? 403 : code === "INVALID_INPUT" ? 400 : 500;
+    sendError(res, code, message, status);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2) LISTING DETAIL
+// GET /v1/catalog/listings/:id
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/catalog/listings/:id", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const ctx = toAuthContext(req.user);
+    const listing = await CatalogController.getListing(ctx, req.params.id);
+
+    if (!listing) {
+      sendError(res, "NOT_FOUND", "Listing not found", 404);
+      return;
+    }
+
+    res.json({ listing });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    const code = error.code || "INTERNAL_ERROR";
+    const message = error.message || "Failed to fetch listing";
+    const status = code === "PERMISSION_DENIED" ? 403 : code === "NOT_FOUND" ? 404 : 500;
+    sendError(res, code, message, status);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3) CONNECT FEED
+// GET /v1/connect/feed?region=&limit=
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/connect/feed", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const ctx = toAuthContext(req.user);
+    const query = {
+      region: req.query.region as string | undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+    };
+
+    const items = await ConnectController.getActiveFeed(ctx, query);
+    res.json({
+      items,
+      hasMore: false,
+      cursor: null,
+    });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    const code = error.code || "INTERNAL_ERROR";
+    const message = error.message || "Failed to fetch feed";
+    const status = code === "INVALID_INPUT" ? 400 : 500;
+    sendError(res, code, message, status);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4) CONNECT LIVE VENUES
+// GET /v1/connect/live-venues?region=
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/connect/live-venues", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const ctx = toAuthContext(req.user);
+    const query = {
+      region: req.query.region as string | undefined,
+    };
+
+    const venues = await ConnectController.getLiveVenues(ctx, query);
+    res.json({ venues });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    const code = error.code || "INTERNAL_ERROR";
+    const message = error.message || "Failed to fetch live venues";
+    const status = code === "INVALID_INPUT" ? 400 : 500;
+    sendError(res, code, message, status);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5) CHECK-IN
+// POST /v1/connect/checkin
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/connect/checkin", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const ctx = toAuthContext(req.user);
+    const { pinId, pinType } = req.body;
+
+    if (!pinId || !pinType) {
+      sendError(res, "INVALID_INPUT", "pinId and pinType are required", 400);
+      return;
+    }
+
+    await ConnectController.checkIn(ctx, { pinId, pinType });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    const code = error.code || "INTERNAL_ERROR";
+    const message = error.message || "Failed to check in";
+    const status = code === "INVALID_INPUT" ? 400 : 500;
+    sendError(res, code, message, status);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6) NOTIFICATIONS
+// GET /v1/notifications?limit=&unreadOnly=
+// GET /v1/notifications/unread-count
+// POST /v1/notifications/:id/read
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/notifications", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.uid;
+    const query = {
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+      unreadOnly: req.query.unreadOnly === "true",
+    };
+
+    const [notifications, unreadCount] = await Promise.all([
+      NotificationsService.getNotificationsForUser(userId, query),
+      NotificationsService.getUnreadCount(userId),
+    ]);
+
+    res.json({ notifications, unreadCount });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    sendError(res, "INTERNAL_ERROR", error.message || "Failed to fetch notifications", 500);
+  }
+});
+
+router.get("/notifications/unread-count", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.uid;
+    const unreadCount = await NotificationsService.getUnreadCount(userId);
+    res.json({ unreadCount });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    sendError(res, "INTERNAL_ERROR", error.message || "Failed to fetch unread count", 500);
+  }
+});
+
+router.post("/notifications/:id/read", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const notificationId = req.params.id;
+    const userId = req.user!.uid;
+
+    // Verify ownership before marking as read
+    const notification = await NotificationsService.getNotification(notificationId);
+    if (!notification) {
+      sendError(res, "NOT_FOUND", "Notification not found", 404);
+      return;
+    }
+    if (notification.userId !== userId) {
+      sendError(res, "PERMISSION_DENIED", "Not your notification", 403);
+      return;
+    }
+
+    await NotificationsService.markAsRead(notificationId);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    sendError(res, "INTERNAL_ERROR", error.message || "Failed to mark as read", 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7) PUSH TOKEN REGISTRATION
+// POST /v1/users/push-token
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/users/push-token", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.uid;
+    const { token, platform } = req.body;
+
+    if (!token || !platform) {
+      sendError(res, "INVALID_INPUT", "token and platform are required", 400);
+      return;
+    }
+
+    if (!["ios", "android"].includes(platform)) {
+      sendError(res, "INVALID_INPUT", "platform must be 'ios' or 'android'", 400);
+      return;
+    }
+
+    // Store push token
+    await db.collection("pushTokens").doc(userId).set(
+      {
+        token,
+        platform,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const error = err as { code?: string; message?: string };
+    sendError(res, "INTERNAL_ERROR", error.message || "Failed to save push token", 500);
+  }
 });
 
 export default router;

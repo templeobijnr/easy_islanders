@@ -15,6 +15,8 @@ export interface MapMiniProps {
     onChange: (lat: number, lng: number) => void;
 }
 
+const MAPBOX_TOKEN = (import.meta as any).env?.VITE_MAPBOX_TOKEN as string | undefined;
+
 const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
@@ -22,6 +24,15 @@ const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
 
     useEffect(() => {
         if (!mapContainer.current || map.current) return;
+
+        if (!MAPBOX_TOKEN) {
+            console.error(
+                "[MapMini] Missing Mapbox token (VITE_MAPBOX_TOKEN). Map disabled.",
+            );
+            return;
+        }
+
+        mapboxgl.accessToken = MAPBOX_TOKEN;
 
         // Initialize map
         map.current = new mapboxgl.Map({
@@ -67,6 +78,14 @@ const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
             map.current.flyTo({ center: [lng, lat], zoom: 13 });
         }
     }, [lat, lng]);
+
+    if (!MAPBOX_TOKEN) {
+        return (
+            <div className="w-full h-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-semibold rounded-lg">
+                Map unavailable (missing VITE_MAPBOX_TOKEN)
+            </div>
+        );
+    }
 
     return <div ref={mapContainer} className="w-full h-full" />;
 };

@@ -1,6 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import * as admin from 'firebase-admin';
 
+function makeTraceId(): string {
+    return `trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sendAuthError(res: Response, status: number, message: string) {
+    res.status(status).json({
+        error: {
+            code: status === 401 ? 'PERMISSION_DENIED' : 'PERMISSION_DENIED',
+            message,
+            traceId: makeTraceId(),
+        },
+    });
+}
+
 // Extend Express Request type to include our User
 declare global {
     namespace Express {
@@ -19,7 +33,7 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Unauthorized: No token provided' });
+        sendAuthError(res, 401, 'Unauthorized: No token provided');
         return; // Ensure we return to stop execution
     }
 
@@ -39,7 +53,7 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
         next();
     } catch (error) {
         console.error('Auth Error:', error);
-        res.status(403).json({ error: 'Unauthorized: Invalid token' });
+        sendAuthError(res, 403, 'Unauthorized: Invalid token');
         return;
     }
 };

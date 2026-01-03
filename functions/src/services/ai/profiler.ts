@@ -27,7 +27,7 @@ export async function analyzeChatTurn(
 
   const model = client.getGenerativeModel(
     {
-      model: process.env.GEMINI_MODEL || "gemini-2.0-flash-exp",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       systemInstruction: `
         You are an expert profiler. Analyze the latest user message and update a user intelligence graph.
         Output strict JSON with: { attributes: {}, segments: [], missingData: [] }.

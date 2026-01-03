@@ -258,10 +258,10 @@ export const handleBusinessChatMessage = async (req: Request, res: Response) => 
 
         // 7. Initialize Gemini
         const model = getGenAI().getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
             systemInstruction: systemPrompt,
             tools: [{ functionDeclarations: BUSINESS_AGENT_TOOLS as any }],
-            toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } }
+            toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.ANY } }
         });
 
         // 8. Start chat with history

@@ -1,44 +1,65 @@
-
+/**
+ * App
+ * 
+ * Root application component with proper React Router integration.
+ * Uses AppRoutes for centralized route configuration.
+ */
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
-import Hero from './components/layout/Hero';
-import AgentChat from './pages/chat/AgentChat';
-import LifestyleHighlights from './pages/home/LifestyleHighlights';
-import AboutSection from './pages/home/AboutSection';
-import FeaturedDestinations from './pages/home/FeaturedDestinations';
-import FeaturedStays from './pages/home/FeaturedStays';
-import Explore from './pages/explore/Explore';
-import BusinessDashboard from './dashboard/BusinessDashboard';
-import ControlTower from './components/admin/ControlTower'; // Import Admin
-import Connect from './pages/connect/Connect';
-import RequestsView from './components/consumer/RequestsView';
-import PromotionsView from './components/consumer/PromotionsView';
-import ProfileView from './components/profile/ProfileView';
-import SettingsView from './components/settings/SettingsView';
 import AuthModal from './auth/AuthModal';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { AsyncProcessor } from './services/asyncProcessor';
+import { AppRoutes } from './AppRoutes';
 
-type View = 'home' | 'dashboard' | 'connect' | 'requests' | 'promotions' | 'explore' | 'profile' | 'settings' | 'admin';
+/**
+ * Determines the active view based on pathname for Navbar highlighting
+ */
+function getActiveView(pathname: string): 'home' | 'discover' | 'explore' | 'connect' | 'messages' {
+  if (pathname === '/discover') return 'discover';
+  if (pathname.startsWith('/connect')) return 'connect';
+  if (pathname === '/explore') return 'explore';
+  if (pathname === '/messages') return 'messages';
+  return 'home';
+}
+
+/**
+ * Routes that should render without Navbar/Footer (full-screen experiences)
+ */
+const NO_LAYOUT_PATHS = [
+  '/admin/login',
+  '/admin',
+  '/admin/merve',
+  '/m',
+  '/m/jobs',
+  '/dashboard',
+  '/dashboard/onboarding',
+];
+
+/**
+ * Check if the current path should hide the main layout
+ */
+function shouldHideLayout(pathname: string): boolean {
+  return NO_LAYOUT_PATHS.some(path =>
+    pathname === path || pathname.startsWith(path + '/')
+  );
+}
 
 const AppContent: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('home');
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean; view: 'login' | 'signup' }>({ isOpen: false, view: 'login' });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [authModal, setAuthModal] = useState<{ isOpen: boolean; view: 'login' | 'signup' }>({
+    isOpen: false,
+    view: 'login'
+  });
 
   // Initialize Async Background Tasks
   useEffect(() => {
     AsyncProcessor.init();
     return () => AsyncProcessor.stop();
   }, []);
-
-  const handleStartChat = () => {
-    const agentSection = document.getElementById('agent');
-    if (agentSection) {
-      agentSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   const openAuth = (view: 'login' | 'signup') => {
     setAuthModal({ isOpen: true, view });
@@ -48,47 +69,33 @@ const AppContent: React.FC = () => {
     setAuthModal({ ...authModal, isOpen: false });
   };
 
-  if (currentView === 'admin') {
-    return <ControlTower onExit={() => setCurrentView('home')} />;
+  const handleExit = () => {
+    navigate('/');
+  };
+
+  // Routes without Navbar/Footer
+  if (shouldHideLayout(location.pathname)) {
+    return (
+      <>
+        <AppRoutes onExit={handleExit} />
+        <AuthModal
+          isOpen={authModal.isOpen}
+          initialView={authModal.view}
+          onClose={closeAuth}
+        />
+      </>
+    );
   }
 
-  if (currentView === 'dashboard') {
-    return <BusinessDashboard onExit={() => setCurrentView('home')} />;
-  }
-
+  // Standard layout with Navbar and Footer
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
-        onOpenDashboard={() => setCurrentView('dashboard')}
-        onOpenConnect={() => setCurrentView('connect')}
-        onOpenRequests={() => setCurrentView('requests')}
-        onOpenPromotions={() => setCurrentView('promotions')}
-        onOpenExplore={() => setCurrentView('explore')}
-        onOpenHome={() => setCurrentView('home')}
-        onOpenProfile={() => setCurrentView('profile')}
-        onOpenSettings={() => setCurrentView('settings')}
-        onOpenAdmin={() => setCurrentView('admin')} // Admin Trigger
         onOpenAuth={openAuth}
-        activeView={currentView}
+        activeView={getActiveView(location.pathname)}
       />
 
-      {currentView === 'connect' && <Connect />}
-      {currentView === 'requests' && <RequestsView />}
-      {currentView === 'promotions' && <PromotionsView />}
-      {currentView === 'explore' && <Explore />}
-      {currentView === 'profile' && <ProfileView />}
-      {currentView === 'settings' && <SettingsView />}
-
-      {currentView === 'home' && (
-        <main className="flex-grow">
-          <Hero onStartChat={handleStartChat} onExplore={() => setCurrentView('explore')} />
-          <AgentChat />
-          <FeaturedStays onSeeAll={() => setCurrentView('explore')} />
-          <LifestyleHighlights onSeeAll={() => setCurrentView('explore')} />
-          <AboutSection />
-          <FeaturedDestinations />
-        </main>
-      )}
+      <AppRoutes onExit={handleExit} />
 
       <Footer />
 

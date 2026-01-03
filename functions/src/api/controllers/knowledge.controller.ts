@@ -326,7 +326,7 @@ Answer helpfully and concisely:`;
 async function extractProductsFromText(text: string): Promise<any[]> {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
 
     const prompt = `Extract all products/services/menu items with prices from the following text.
 

@@ -12,12 +12,43 @@ jest.mock('firebase-admin', () => {
         update: jest.fn().mockResolvedValue({}),
     };
     return {
+        initializeApp: jest.fn(),
+        app: jest.fn(() => ({})),
+        auth: jest.fn(() => ({})),
         firestore: jest.fn(() => ({
             collection: jest.fn(() => ({
                 doc: jest.fn(() => mockJobRef),
             })),
         })),
         _mockJobRef: mockJobRef, // Expose for tests
+    };
+});
+
+// Mock getFirestore used by config/firebase.ts (loaded indirectly via auditRepository)
+jest.mock('firebase-admin/firestore', () => {
+    const mockSet = jest.fn().mockResolvedValue({});
+    const mockGet = jest.fn().mockResolvedValue({ exists: false });
+    const mockDoc = jest.fn(() => ({
+        set: mockSet,
+        get: mockGet,
+        collection: jest.fn(() => ({
+            doc: jest.fn(() => ({ set: mockSet, get: mockGet })),
+        })),
+    }));
+    const mockCollection = jest.fn(() => ({ doc: mockDoc }));
+    return {
+        getFirestore: jest.fn(() => ({
+            collection: mockCollection,
+            runTransaction: jest.fn(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: false }),
+                    set: jest.fn(),
+                    update: jest.fn(),
+                })
+            ),
+        })),
+        FieldValue: { serverTimestamp: jest.fn() },
+        Timestamp: { now: jest.fn() },
     };
 });
 
@@ -82,6 +113,7 @@ describe('Job Confirmation Endpoint', () => {
             params: { id: 'job-123' },
             body: {},
             traceId: 'trace-123',
+            get: jest.fn(() => undefined),
         };
     });
 

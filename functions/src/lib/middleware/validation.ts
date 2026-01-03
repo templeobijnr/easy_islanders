@@ -45,7 +45,7 @@ export function validateRequest<T>(schema: ZodSchema<T>) {
 function formatZodErrors(error: ZodError): Array<{ path: string; message: string }> {
     return error.errors.map((err) => ({
         path: err.path.join('.'),
-        message: getErrorMessage(err),
+        message: err.message || 'Validation error',
     }));
 }
 

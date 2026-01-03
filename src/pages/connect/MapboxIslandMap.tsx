@@ -38,6 +38,15 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
   currentUser,
   places: propPlaces,
 }) => {
+  if (!MAPBOX_TOKEN) {
+    console.error("[MapboxIslandMap] Missing Mapbox token (VITE_MAPBOX_TOKEN).");
+    return (
+      <div className="w-full h-[70vh] md:h-[75vh] bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-semibold rounded-2xl border border-slate-200">
+        Map unavailable (missing VITE_MAPBOX_TOKEN)
+      </div>
+    );
+  }
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [lng, setLng] = useState(33.32); // Cyprus Center Longitude
@@ -91,6 +100,18 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
           "star-intensity": 0.6, // Background star brightness (default 0.35 at low zoooms )
         } as any);
       });
+
+      map.current.on("error", (e) => {
+        console.error("🔴 [Mapbox] Map Error:", e);
+      });
+
+      // Force resize to ensure map renders if container was hidden/resized
+      const resizeObserver = new ResizeObserver(() => {
+        map.current?.resize();
+      });
+      resizeObserver.observe(mapContainer.current);
+
+
 
       map.current.on("moveend", () => {
         if (!map.current) return;
@@ -160,21 +181,28 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
     if (!map.current) return;
     try {
       const center = map.current.getCenter();
-      const res = await fetch(
-        v1ApiUrl(
-          `/users/nearby?lat=${center.lat}&lng=${center.lng}&radius=5000`,
-        ),
-        {
-          headers: {
-            // 'Authorization': `Bearer ${token}` // In real app
-          },
-        },
+      const url = v1ApiUrl(
+        `/users/nearby?lat=${center.lat}&lng=${center.lng}&radius=5000`,
       );
+      logger.debug("[MapboxIslandMap] fetchUsers url:", url);
+      const res = await fetch(url, {
+        headers: {
+          // 'Authorization': `Bearer ${token}` // In real app
+        },
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(
+          `[fetchUsers] HTTP ${res.status} ${res.statusText}; body starts: ${body.slice(0, 60)}`,
+        );
+      }
       const data = await res.json();
       if (data.users) {
         setUsers(data.users);
       }
-    } catch (err) {
+    } catch (err: any) {
+      // Ignore 404s (common on localhost if functions not running)
+      if (err.message && err.message.includes("404")) return;
       console.error("🔴 [Connect] Error fetching users:", err);
     }
   };
@@ -204,6 +232,9 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
 
       const el = document.createElement("div");
       el.className = "marker";
+      el.style.display = "block"; // Ensure visibility
+      el.style.width = "32px";
+      el.style.height = "32px";
 
       // Icon Logic based on type/category
       let icon = "📍";
@@ -244,7 +275,7 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
         .join("");
 
       el.innerHTML = `
-                <div class="relative flex flex-col items-center">
+                <div class="relative flex flex-col items-center" style="width: 32px; height: 32px;">
                     <div class="relative flex items-center justify-center w-8 h-8 ${color} rounded-full border-2 border-white shadow-lg cursor-pointer transform transition-transform hover:scale-110">
                         <span class="text-xs">${icon}</span>
                         ${checkInCount > 0
@@ -256,6 +287,7 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
           : ""
         }
                     </div>
+
                     ${checkInCount > 0
           ? `
                         <div class="flex mt-1" style="margin-left: 6px;">
@@ -453,7 +485,7 @@ const MapboxIslandMap: React.FC<MapboxIslandMapProps> = ({
 
   return (
     <div className="relative w-full h-[75vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 group">
-      <div ref={mapContainer} className="absolute inset-0" />
+      <div ref={mapContainer} className="absolute inset-0" style={{ width: "100%", height: "100%" }} />
 
       {/* UI Overlays */}
       <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 flex gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-full border border-slate-700 shadow-xl overflow-x-auto max-w-[90vw] scrollbar-hide">

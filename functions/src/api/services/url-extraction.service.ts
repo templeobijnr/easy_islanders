@@ -223,7 +223,7 @@ export async function structureExtractedText(rawText: string, businessName?: str
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
 
         const prompt = `You are extracting business information from a website for ${businessName || 'a business'}.
 

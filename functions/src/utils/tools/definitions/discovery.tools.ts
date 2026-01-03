@@ -47,3 +47,34 @@ export const searchEventsTool: FunctionDeclaration = {
     },
   },
 };
+
+export const searchStaysTool: FunctionDeclaration = {
+  name: "searchStays",
+  description:
+    "PRIMARY TOOL for stays, rentals, accommodation. Use for: daily rentals, villas, apartments, holiday homes, short-term rentals, vacation homes, places to stay, accommodation requests. This is the ONLY tool for rental properties.",
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      location: {
+        type: SchemaType.STRING,
+        description: "City/area: Kyrenia, Famagusta, Nicosia, Alsancak, etc.",
+      },
+      type: {
+        type: SchemaType.STRING,
+        description: "Type of stay: villa, apartment, daily, long-term, studio, holiday home.",
+      },
+      minPrice: {
+        type: SchemaType.NUMBER,
+        description: "Minimum price per night or month.",
+      },
+      maxPrice: {
+        type: SchemaType.NUMBER,
+        description: "Maximum price per night or month.",
+      },
+      bedrooms: {
+        type: SchemaType.NUMBER,
+        description: "Minimum number of bedrooms required.",
+      },
+    },
+  },
+};

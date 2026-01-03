@@ -43,3 +43,4 @@ firestore-debug.log
 # Editor artifacts
 .cursor/
 __MACOSX/
+functions/lib/

@@ -1,5 +1,7 @@
 /**
  * AddCurationModal Barrel Export
  */
-export { default as AddCurationModal } from "./AddCurationModal";
+import AddCurationModal from "./AddCurationModal";
+export { AddCurationModal };
 export type { AddCurationModalProps } from "./types";
+export default AddCurationModal;

@@ -63,8 +63,13 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, activeView }) => {
         <div className={`hidden md:flex items-center gap-8 font-medium transition-colors duration-300 ${isSolidBackground ? 'text-slate-600' : 'text-white/90'}`}>
           {/* Chat scrolls to agent section */}
           <Link
-            to="/chat"
+            to="/"
             className="hover:text-teal-500 transition-colors flex items-center gap-2"
+            onClick={() => {
+              // Production behavior: Chat link points to `/` and scrolls to embedded agent section.
+              const agent = document.getElementById("agent");
+              if (agent) agent.scrollIntoView({ behavior: "smooth" });
+            }}
           >
             <MessageCircle size={18} />
             <span>Chat</span>

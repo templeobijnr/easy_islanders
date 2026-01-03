@@ -56,9 +56,21 @@ export async function getMyCheckIns(userId: string, limitCount: number = 5): Pro
 
 /** Get curated items from connectCuration collection */
 async function getCuratedItems(section: string, region?: Region): Promise<ConnectFeedItem[]> {
-    const q = query(collection(db, "connectCuration"), where("section", "==", section), where("enabled", "==", true), orderBy("priority", "desc"), limit(10));
+    const q = query(
+        collection(db, "connectCuration"),
+        where("section", "==", section),
+        where("enabled", "==", true),
+        orderBy("priority", "desc"),
+        limit(10),
+    );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => { const d = doc.data(); if (region && d.region && d.region !== region) return null; return { id: doc.id, ...d, _curated: true } as ConnectFeedItem; }).filter(Boolean) as ConnectFeedItem[];
+    return snapshot.docs
+        .map((doc) => {
+            const d = doc.data();
+            if (region && d.region && d.region !== region) return null;
+            return { id: doc.id, ...d, _curated: true } as ConnectFeedItem;
+        })
+        .filter(Boolean) as ConnectFeedItem[];
 }
 
 /** CHANNEL 2: TODAY'S ITEMS */
@@ -95,8 +107,23 @@ export async function getWeekItems(region?: Region): Promise<ConnectFeedItem[]> 
 export async function getFeaturedItems(region?: Region): Promise<ConnectFeedItem[]> {
     const curated = await getCuratedItems("featured", region);
     if (curated.length >= 10) return curated;
-    const listings = await UnifiedListingsService.getAllListings({ region, limit: 10 });
-    const featured = listings.filter((l) => (l.rating || 0) >= 4).slice(0, 10 - curated.length).map((l) => ({ id: l.id, type: l.type, title: l.title || l.name, description: l.description, category: l.category, region: l.region, images: l.images, itemImage: l.heroImage || l.images?.[0], coordinates: l.coordinates, _badges: ["⭐ Top Rated"] }));
+    const all = await UnifiedListingsService.getAll();
+    const listings = region ? all.filter((l) => l.region === region) : all;
+    const featured = listings
+        .filter((l) => (l.rating || 0) >= 4)
+        .slice(0, 10 - curated.length)
+        .map((l) => ({
+            id: l.id,
+            type: l.type,
+            title: l.title || l.name,
+            description: l.description,
+            category: l.category,
+            region: l.region,
+            images: l.images,
+            itemImage: l.heroImage || l.images?.[0],
+            coordinates: l.coordinates,
+            _badges: ["⭐ Top Rated"],
+        }));
     return [...curated, ...featured];
 }
 

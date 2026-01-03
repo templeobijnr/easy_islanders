@@ -14,7 +14,7 @@ import { getErrorMessage } from '../utils/errors';
  * - idempotency/{key}
  */
 
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, FieldValue, DocumentSnapshot, DocumentReference, Transaction as FirestoreTransaction } from 'firebase-admin/firestore';
 import type {
     Transaction,
     TxEvent,
@@ -203,11 +203,11 @@ export const transactionRepository = {
             }
         }
 
-        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId);
-        const lockRef = db.collection(getLocksPath(businessId)).doc(lockKey);
+        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId) as DocumentReference;
+        const lockRef = db.collection(getLocksPath(businessId)).doc(lockKey) as DocumentReference;
 
         try {
-            const result = await db.runTransaction(async (transaction) => {
+            const result = await db.runTransaction(async (transaction: FirestoreTransaction) => {
                 // Read transaction
                 const txDoc = await transaction.get(txRef);
                 if (!txDoc.exists) {
@@ -341,11 +341,11 @@ export const transactionRepository = {
             }
         }
 
-        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId);
+        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId) as DocumentReference;
         const confirmationCode = generateConfirmationCode();
 
         try {
-            const result = await db.runTransaction(async (transaction) => {
+            const result = await db.runTransaction(async (transaction: FirestoreTransaction) => {
                 const txDoc = await transaction.get(txRef);
                 if (!txDoc.exists) {
                     return { success: false, errorCode: 'TRANSACTION_NOT_FOUND' as const };
@@ -459,10 +459,10 @@ export const transactionRepository = {
             }
         }
 
-        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId);
+        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId) as DocumentReference;
 
         try {
-            const result = await db.runTransaction(async (transaction) => {
+            const result = await db.runTransaction(async (transaction: FirestoreTransaction) => {
                 const txDoc = await transaction.get(txRef);
                 if (!txDoc.exists) {
                     return { success: false, errorCode: 'TRANSACTION_NOT_FOUND' as const };
@@ -550,10 +550,10 @@ export const transactionRepository = {
             }
         }
 
-        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId);
+        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId) as DocumentReference;
 
         try {
-            const result = await db.runTransaction(async (transaction) => {
+            const result = await db.runTransaction(async (transaction: FirestoreTransaction) => {
                 const txDoc = await transaction.get(txRef);
                 if (!txDoc.exists) {
                     return { success: false, errorCode: 'TRANSACTION_NOT_FOUND' as const };
@@ -618,9 +618,9 @@ export const transactionRepository = {
      */
     expireHold: async (businessId: string, transactionId: string): Promise<void> => {
         const now = Timestamp.now();
-        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId);
+        const txRef = db.collection(getTransactionsPath(businessId)).doc(transactionId) as DocumentReference;
 
-        await db.runTransaction(async (transaction) => {
+        await db.runTransaction(async (transaction: FirestoreTransaction) => {
             const txDoc = await transaction.get(txRef);
             if (!txDoc.exists) return;
 
@@ -675,7 +675,7 @@ export const transactionRepository = {
             .limit(limit)
             .get();
 
-        return snapshot.docs.map(doc => {
+        return snapshot.docs.map((doc: DocumentSnapshot) => {
             // Path: businesses/{businessId}/transactions/{txId}
             const pathParts = doc.ref.path.split('/');
             return {
@@ -690,7 +690,7 @@ export const transactionRepository = {
             .orderBy('createdAt', 'asc')
             .get();
 
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TxEvent));
+        return snapshot.docs.map((doc: DocumentSnapshot) => ({ id: doc.id, ...doc.data() } as TxEvent));
     },
 };
 

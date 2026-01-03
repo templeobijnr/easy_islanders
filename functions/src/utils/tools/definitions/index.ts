@@ -1,4 +1,5 @@
-export * from "./marketplace.tools";
+// REMOVED: searchMarketplace is causing issues
+// export * from "./marketplace.tools";
 export * from "./booking.tools";
 export * from "./info.tools";
 export * from "./messaging.tools";

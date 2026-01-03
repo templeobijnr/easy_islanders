@@ -8,6 +8,10 @@
  * - Extracted components: MerveEnabledToggle, ActionList, ActionRow
  * - Behavior preserved: yes (no UI change)
  */
+
+// Re-export IngestKind from the canonical source to avoid duplication
+export type { IngestKind } from "../OfferingsManager/types";
+
 export type MervePlaceType =
     | "restaurant" | "cafe" | "bar" | "hotel" | "villa" | "apartment"
     | "spa" | "gym" | "activity" | "tour" | "experience" | "event"
@@ -17,14 +21,12 @@ export type MerveActionType =
     | "order_food" | "reserve_table" | "book_stay" | "book_activity"
     | "request_service" | "order_supplies" | "register_event" | "inquire";
 
-export type IngestKind = "offerings" | "menu" | "rooms" | "services" | "schedule";
-
 export interface MerveAction {
     id: string;
     actionType: MerveActionType;
     enabled: boolean;
     dispatch: { channel: "whatsapp"; toE164?: string; template?: string };
-    data?: { kind?: IngestKind; required?: boolean };
+    data?: { kind?: import("../OfferingsManager/types").IngestKind; required?: boolean };
     tags?: string[];
     notes?: string;
 }

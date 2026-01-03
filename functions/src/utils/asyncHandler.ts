@@ -12,7 +12,7 @@
  */
 
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { AppError, toErrorResponse, getHttpStatus } from '../utils/errors';
+import { AppError, isAppError } from '../utils/errors';
 import { getTraceId } from '../middleware/traceId.middleware';
 
 /**
@@ -33,18 +33,45 @@ type AsyncRequestHandler = (
 export function asyncHandler(fn: AsyncRequestHandler): RequestHandler {
     return (req: Request, res: Response, next: NextFunction) => {
         Promise.resolve(fn(req, res, next)).catch((err) => {
-            const traceId = getTraceId(req);
-
-            // Normalize to AppError
-            if (!(err instanceof AppError)) {
-                err = AppError.internal(
-                    err instanceof Error ? err.message : 'Handler error',
-                    err instanceof Error ? err : undefined
+            // Normalize to AppError if not already
+            if (!isAppError(err)) {
+                err = new AppError(
+                    'INTERNAL',
+                    err instanceof Error ? err.message : 'Handler error'
                 );
             }
 
             next(err);
         });
+    };
+}
+
+/**
+ * Get HTTP status code from error.
+ */
+function getHttpStatus(err: Error): number {
+    if (isAppError(err)) {
+        switch (err.code) {
+            case 'NOT_FOUND': return 404;
+            case 'PERMISSION_DENIED': return 403;
+            case 'INVALID_INPUT': return 400;
+            case 'ALREADY_EXISTS': return 409;
+            default: return 500;
+        }
+    }
+    return 500;
+}
+
+/**
+ * Convert error to response object.
+ */
+function toErrorResponse(err: Error, traceId?: string) {
+    return {
+        error: {
+            message: err.message || 'Internal server error',
+            code: isAppError(err) ? err.code : 'INTERNAL',
+            traceId,
+        }
     };
 }
 

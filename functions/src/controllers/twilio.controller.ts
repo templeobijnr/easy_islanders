@@ -16,6 +16,7 @@ import { normalizeTwilioWhatsAppPayload } from "../services/channels/whatsapp";
 import { createIfAbsent } from "../services/domains/channels/whatsappInbound.repository";
 import { getFunctions } from "firebase-admin/functions";
 import twilio from "twilio";
+import { processTwilioMessageStatus } from "../services/domains/webhooks/twilioStatus.service";
 
 function getPublicUrl(req: Request): string {
   const proto =
@@ -173,7 +174,7 @@ export const handleMessageStatus = async (req: Request, res: Response) => {
       ErrorMessage: errorMessage,
     } = req.body;
 
-    // Log to Firestore for tracking
+    // Keep legacy log for visibility (non-authoritative)
     await db.collection("whatsapp_logs").add({
       messageSid,
       status,
@@ -182,6 +183,23 @@ export const handleMessageStatus = async (req: Request, res: Response) => {
       errorMessage: errorMessage || null,
       timestamp: new Date(),
     });
+
+    // Canonical deterministic webhook event mapping (dispatchMessages/* or quarantine).
+    // Best-effort: do not fail the webhook if internal mapping fails.
+    const traceId = req.get("x-trace-id") || `twilio-status-${Date.now()}`;
+    try {
+      await processTwilioMessageStatus({
+        messageSid,
+        status,
+        to,
+        errorCode: errorCode || null,
+        errorMessage: errorMessage || null,
+        signatureStatus: "verified",
+        traceId,
+      });
+    } catch (mapErr) {
+      logger.error("❌ [Twilio Status] Mapping failed (non-fatal)", mapErr);
+    }
 
     logger.debug(
       `✅ [Twilio Status] Logged status: ${status} for ${messageSid}`,

@@ -5,9 +5,9 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { getStorage, ref, uploadBytes } from "firebase/storage";
-import { useAuth } from "../../../context/AuthContext";
-import { logger } from "../../../utils/logger";
-import { v1ApiUrl } from "../../../config/api";
+import { useAuth } from "../../../../context/AuthContext";
+import { logger } from "../../../../utils/logger";
+import { v1ApiUrl } from "../../../../config/api";
 import type { KnowledgeDoc, ManualItem, TeachAgentView, TeachAgentError } from "../types";
 import { DEFAULT_MANUAL_ITEM } from "../types";
 

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>City Selection - North Cyprus</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>.no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display transition-colors duration-200">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto bg-background-light dark:bg-background-dark shadow-xl">
+<header class="flex items-center justify-between p-5 pt-8 bg-background-light dark:bg-background-dark sticky top-0 z-20">
+<h2 class="text-xl font-bold leading-tight tracking-tight flex-1 dark:text-white">Where are you headed?</h2>
+<button class="flex items-center justify-end active:opacity-70 transition-opacity">
+<span class="text-primary text-base font-semibold leading-normal shrink-0">Skip</span>
+</button>
+</header>
+<div class="px-5 pb-2 sticky top-[72px] z-20 bg-background-light dark:bg-background-dark">
+<label class="flex flex-col w-full">
+<div class="flex w-full items-center rounded-xl h-12 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<div class="flex items-center justify-center pl-4 pr-2 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined text-[24px]">search</span>
+</div>
+<input class="flex w-full flex-1 bg-transparent border-none text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-0 text-base font-normal h-full rounded-r-xl" placeholder="Search for a city..." type="text"/>
+</div>
+</label>
+</div>
+<div class="px-5 py-4">
+<button class="group flex items-center gap-4 w-full p-3 rounded-xl bg-primary/10 dark:bg-primary/20 active:bg-primary/20 dark:active:bg-primary/30 transition-colors">
+<div class="flex items-center justify-center rounded-full bg-primary text-white shrink-0 size-10 shadow-sm group-active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">my_location</span>
+</div>
+<div class="flex flex-col items-start flex-1">
+<p class="text-primary font-semibold text-base leading-tight">Use my current location</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Find agents nearby</p>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">chevron_right</span>
+</button>
+</div>
+<div class="flex-1 flex flex-col pb-10">
+<div class="flex flex-col">
+<div class="px-5 pb-2 pt-2">
+<h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight">Recently Viewed</h3>
+</div>
+<button class="flex items-center gap-4 px-5 py-3 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors group">
+<div class="flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0 size-10">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+</div>
+<div class="flex flex-col items-start flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium leading-normal truncate w-full text-left">Kyrenia</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-600 text-[24px] group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center gap-4 px-5 py-3 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors group">
+<div class="flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0 size-10">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+</div>
+<div class="flex flex-col items-start flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium leading-normal truncate w-full text-left">Nicosia</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-600 text-[24px] group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</div>
+<div class="h-px bg-slate-200 dark:bg-slate-800 mx-5 my-4"></div>
+<div class="flex flex-col">
+<div class="px-5 pb-3 pt-1">
+<h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight">Cities in North Cyprus</h3>
+</div>
+<div class="mx-5 flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">Kyrenia (Girne)</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">156 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">Nicosia (Lefkoşa)</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">210 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">Famagusta (Gazimağusa)</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">98 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">İskele</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">45 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">Güzelyurt</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">12 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group text-left w-full active:bg-slate-100 dark:active:bg-slate-700">
+<div class="flex flex-col">
+<span class="text-slate-900 dark:text-white font-semibold text-base">Lefke</span>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-primary text-[14px]">smart_toy</span>
+<span class="text-primary text-xs font-medium">8 Agents active</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="mt-8 mb-4 text-center">
+<a class="text-sm font-medium text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors" href="#">I'll choose later</a>
+</div>
+</div>
+</div>
+
+</body></html>

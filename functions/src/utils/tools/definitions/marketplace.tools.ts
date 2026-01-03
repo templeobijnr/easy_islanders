@@ -3,19 +3,19 @@ import { FunctionDeclaration, SchemaType } from "@google/generative-ai";
 export const searchMarketplaceTool: FunctionDeclaration = {
   name: "searchMarketplace",
   description:
-    "Search the database for Real Estate, Cars, Services, etc. Returns full details including amenities.",
+    "Search for Cars and Properties FOR SALE. DO NOT use for rentals, villas, apartments, or stays - use searchStays for those instead.",
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       domain: {
         type: SchemaType.STRING,
         description:
-          'The domain: "Real Estate", "Cars", "Services", "Restaurants", "Events".',
+          'The domain: "Cars" or "Real Estate FOR SALE". NOT for rentals.',
       },
       subCategory: {
         type: SchemaType.STRING,
         description:
-          'Filter by specific type: "sale", "short-term", "long-term", "project", "rental" (cars).',
+          'Filter by type: "sale" (properties), "rental" (cars only, not homes).',
       },
       location: {
         type: SchemaType.STRING,
@@ -49,3 +49,4 @@ export const searchMarketplaceTool: FunctionDeclaration = {
     required: ["domain"],
   },
 };
+

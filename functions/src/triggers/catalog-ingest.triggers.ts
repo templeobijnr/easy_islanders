@@ -420,7 +420,7 @@ async function extractTextFromUrl(rawUrl: string): Promise<string> {
 }
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-    const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = getGenAI().getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
     const result = await model.generateContent([
         {
             inlineData: {
@@ -438,7 +438,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
 }
 
 async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
-    const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = getGenAI().getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
     const result = await model.generateContent([
         {
             inlineData: {
@@ -490,7 +490,7 @@ function kindPrompt(kind: IngestKind): string {
 }
 
 async function extractItemsFromText(kind: IngestKind, rawText: string): Promise<CatalogIngestProposal['extractedItems']> {
-    const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = getGenAI().getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
 
     const prompt = [
         `You are extracting structured listing data for kind: ${kind}.`,

@@ -1,4 +1,5 @@
-import { searchMarketplaceTool } from "./marketplace.tools";
+// REMOVED: searchMarketplace - causing issues, using searchStays for all listings
+// import { searchMarketplaceTool } from "./marketplace.tools";
 import {
   initiateBookingTool,
   scheduleViewingTool,
@@ -11,18 +12,13 @@ import {
 } from "./messaging.tools";
 import { requestTaxiTool, dispatchTaxiTool } from "./taxi.tools";
 import { createConsumerRequestTool } from "./consumerRequest.tools";
-import { searchLocalPlacesTool, searchEventsTool } from "./discovery.tools";
+import { searchLocalPlacesTool, searchEventsTool, searchStaysTool } from "./discovery.tools";
 import {
   getUserProfileTool,
   updateUserProfileTool,
   saveFavoriteItemTool,
   listFavoritesTool,
 } from "./user.tools";
-import {
-  listUserAddressesTool,
-  createOrUpdateAddressTool,
-  setDefaultAddressTool,
-} from "./addressBook.tools";
 import {
   listNearbyUsersTool,
   checkInToPlaceTool,
@@ -69,7 +65,7 @@ import {
 } from "./geo.tools";
 
 export const ALL_TOOL_DEFINITIONS = [
-  searchMarketplaceTool,
+  // REMOVED: searchMarketplaceTool - using searchStays for all listings
   initiateBookingTool,
   consultEncyclopediaTool,
   getRealTimeInfoTool,
@@ -80,13 +76,11 @@ export const ALL_TOOL_DEFINITIONS = [
   scheduleViewingTool,
   searchLocalPlacesTool,
   searchEventsTool,
+  searchStaysTool,
   getUserProfileTool,
   updateUserProfileTool,
   saveFavoriteItemTool,
   listFavoritesTool,
-  listUserAddressesTool,
-  createOrUpdateAddressTool,
-  setDefaultAddressTool,
   listNearbyUsersTool,
   checkInToPlaceTool,
   getCheckInsForPlaceTool,

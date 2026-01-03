@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
 import { db } from "../../config/firebase";
 import { getErrorMessage } from '../../utils/errors';
+import { DispatchService } from "../domains/dispatch/dispatch.service";
 
 import type {
   CreateConsumerRequestArgs,
@@ -380,11 +381,18 @@ export const miscTools = {
           `Reply YES to confirm or NO to decline.`;
 
         try {
-          const { sendWhatsApp } = await import("../twilio.service");
-          const result = await sendWhatsApp(vendorPhone, message);
+          const idempotencyKey = `dispatch:groceryOrder:${orderId}`;
+          const dispatch = await DispatchService.sendWhatsApp({
+            kind: "job_dispatch",
+            toE164: vendorPhone,
+            body: message,
+            correlationId: `groceryOrder:${orderId}`,
+            idempotencyKey,
+            traceId: `grocery-${Date.now()}`,
+          });
 
           await db.collection("groceryOrders").doc(orderId).update({
-            dispatchMessageSid: result.sid,
+            dispatchMessageSid: dispatch.providerMessageId,
             dispatchedAt: new Date().toISOString(),
           });
 

@@ -25,6 +25,7 @@ import type {
 } from "./notifications.schema";
 import { AppError } from "../../utils/errors";
 import type { AuthContext } from "../identity/identity.schema";
+import { DispatchService } from "../../services/domains/dispatch/dispatch.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -75,15 +76,21 @@ async function dispatchToWhatsApp(
             };
         }
 
-        // Send via existing Twilio service
-        const { sendWhatsApp } = await import("../../services/twilio.service");
-        const result = await sendWhatsApp(phone, `*${title}*\n\n${body}`);
+        // Canonical provider boundary: write-before-send via DispatchService.
+        const dispatch = await DispatchService.sendWhatsApp({
+            kind: "user_notification",
+            toE164: phone,
+            body: `*${title}*\n\n${body}`,
+            correlationId: `notif:user:${userId}`,
+            idempotencyKey: `notif_whatsapp:${userId}:${title}:${body}`.slice(0, 200),
+            traceId: `notif-${Date.now()}`,
+        });
 
         return {
             channel: "whatsapp",
             status: "sent",
             attemptedAt: nowIsoString(),
-            messageId: result.sid,
+            messageId: dispatch.providerMessageId,
         };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

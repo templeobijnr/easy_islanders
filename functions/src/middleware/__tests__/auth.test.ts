@@ -44,7 +44,10 @@ describe('Auth Middleware', () => {
 
             expect(mockRes.status).toHaveBeenCalledWith(401);
             expect(mockRes.json).toHaveBeenCalledWith({
-                error: 'Unauthorized: No token provided',
+                error: expect.objectContaining({
+                    code: 'PERMISSION_DENIED',
+                    message: 'Unauthorized: No token provided',
+                }),
             });
             expect(mockNext).not.toHaveBeenCalled();
         });
@@ -66,7 +69,10 @@ describe('Auth Middleware', () => {
 
             expect(mockRes.status).toHaveBeenCalledWith(403);
             expect(mockRes.json).toHaveBeenCalledWith({
-                error: 'Unauthorized: Invalid token',
+                error: expect.objectContaining({
+                    code: 'PERMISSION_DENIED',
+                    message: 'Unauthorized: Invalid token',
+                }),
             });
             expect(mockNext).not.toHaveBeenCalled();
         });

@@ -54,9 +54,28 @@ export const checkHoldInvariant = onSchedule(
 
         try {
             // Get all held locks across all businesses
-            const locksSnap = await db.collectionGroup('resourceLocks')
-                .where('status', '==', 'held')
-                .get();
+            // Note: This requires a composite index on resourceLocks collectionGroup
+            // Index: collectionGroup=resourceLocks, fields=[status (ASC), expiresAt (ASC)]
+            // Deploy with: firebase deploy --only firestore:indexes
+            let locksSnap;
+            try {
+                locksSnap = await db.collectionGroup('resourceLocks')
+                    .where('status', '==', 'held')
+                    .get();
+            } catch (queryError: any) {
+                // Handle FAILED_PRECONDITION - index might not be ready
+                if (queryError?.code === 9 || queryError?.message?.includes('FAILED_PRECONDITION')) {
+                    logger.warn({
+                        severity: 'WARNING',
+                        message: '[Invariant] Firestore index not ready for resourceLocks query',
+                        error: queryError.message,
+                        hint: 'Run: firebase deploy --only firestore:indexes'
+                    });
+                    // Skip this check cycle - will retry on next schedule
+                    return;
+                }
+                throw queryError;
+            }
 
             // Group by lockKey to find duplicates
             const locksByKey = new Map<string, Array<{ txId: string; businessId: string; docPath: string }>>();

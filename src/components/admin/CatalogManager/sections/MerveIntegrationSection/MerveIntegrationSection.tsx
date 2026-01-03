@@ -9,12 +9,12 @@
  * - Behavior preserved: yes (no UI change)
  */
 import React, { useState } from "react";
-import { Bot, ChevronDown, ChevronUp, Plus, Settings } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { useMerveConfig } from "./hooks/useMerveConfig";
 import { ActionRow } from "./components";
 import OfferingsManager from "../OfferingsManager";
 import type { MerveIntegrationSectionProps, MerveActionType } from "./types";
-import { ACTION_METADATA } from "./constants";
+import { getDefaultKindsForPlaceType } from "./constants";
 
 const MerveIntegrationSection: React.FC<MerveIntegrationSectionProps> = (props) => {
     const vm = useMerveConfig(props);
@@ -75,6 +75,8 @@ const MerveIntegrationSection: React.FC<MerveIntegrationSectionProps> = (props) 
                                     onWhatsAppChange={(n) => vm.handleActionWhatsAppChange(actionType, n)}
                                     onDataKindChange={(k) => vm.handleActionDataKindChange(actionType, k)}
                                     onDataRequiredChange={(r) => vm.handleActionDataRequiredChange(actionType, r)}
+                                    listingId={props.listingId}
+                                    marketId={props.marketId}
                                 />
                             ))}
                         </div>
@@ -97,8 +99,13 @@ const MerveIntegrationSection: React.FC<MerveIntegrationSectionProps> = (props) 
                             <h3 className="font-semibold text-lg">Manage Offerings</h3>
                             <button onClick={() => setShowOfferingsManager(false)} className="p-2 hover:bg-slate-100 rounded-lg">&times;</button>
                         </div>
-                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-60px)]">
-                            <OfferingsManager listingId={props.listingId} marketId={props.marketId} />
+                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-60px)] bg-slate-900">
+                            <OfferingsManager
+                                listingId={props.listingId}
+                                listingTitle=""
+                                marketId={props.marketId || "nc"}
+                                kinds={getDefaultKindsForPlaceType(props.placeType)}
+                            />
                         </div>
                     </div>
                 </div>

@@ -143,7 +143,7 @@ async function extractTextFromImage(
   mimeType: string,
 ): Promise<string> {
   const genAI = getGenAI();
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
 
   const result = await model.generateContent([
     {
@@ -203,7 +203,7 @@ async function extractTextFromPdf(
   }
 
   const genAI = getGenAI();
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.5-flash" });
 
   const result = await model.generateContent([
     {

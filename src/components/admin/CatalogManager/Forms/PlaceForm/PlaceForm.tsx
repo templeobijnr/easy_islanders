@@ -9,7 +9,7 @@ import { Loader2, Save } from 'lucide-react';
 import ImageUploader from '../../../Shared/ImageUploader';
 import OfferingsManager from '../../sections/OfferingsManager';
 import MerveIntegrationSection from '../../sections/MerveIntegrationSection';
-import { getAllRegions } from '@/services/discoverConfigService';
+import { getAllRegions } from '../../../../../services/discoverConfigService';
 import { usePlaceFormHandlers } from './hooks/usePlaceFormHandlers';
 import { submitPlace } from './utils/submitPlace';
 import { DEFAULT_FORM_STATE } from './constants';
@@ -22,7 +22,7 @@ import {
     BookingOptionsSection,
 } from './components';
 import type { PlaceFormProps, PlaceFormState, ImportSuggestion } from './types';
-import type { RegionConfig, NormalizationResult } from '@/types/adminConfig';
+import type { RegionConfig, NormalizationResult } from '../../../../types/adminConfig';
 
 const PlaceForm: React.FC<PlaceFormProps> = ({
     initialValue,

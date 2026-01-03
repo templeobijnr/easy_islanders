@@ -22,7 +22,6 @@ import { businessTools } from './business.tools';
 import { miscTools } from './misc.tools';
 import { itineraryTools } from './itinerary.tools';
 import { requestsTools } from './requests.tools';
-import { addressBookTools } from './addressBook.tools';
 
 // V1 Consumer Tools
 import { foodTools } from './food.tools';
@@ -63,9 +62,6 @@ export const toolResolvers = {
 
     // Requests (Services, Orders)
     ...requestsTools,
-
-    // Address Book (deliveries)
-    ...addressBookTools,
 
     // V1 Consumer Tools
     ...foodTools,

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+/**
+ * MapMini - Admin UI component for small interactive maps
+ *
+ * With graceful fallback when Mapbox token is missing.
+ */
+
+import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -8,6 +14,8 @@ interface MapMiniProps {
     onChange: (lat: number, lng: number) => void;
 }
 
+const MAPBOX_TOKEN = (import.meta as any).env?.VITE_MAPBOX_TOKEN as string | undefined;
+
 const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
@@ -15,6 +23,15 @@ const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
 
     useEffect(() => {
         if (!mapContainer.current || map.current) return;
+
+        if (!MAPBOX_TOKEN) {
+            console.error(
+                "[MapMini] Missing Mapbox token (VITE_MAPBOX_TOKEN). Map disabled.",
+            );
+            return;
+        }
+
+        mapboxgl.accessToken = MAPBOX_TOKEN;
 
         // Initialize map
         map.current = new mapboxgl.Map({
@@ -60,6 +77,16 @@ const MapMini: React.FC<MapMiniProps> = ({ lat, lng, onChange }) => {
             map.current.flyTo({ center: [lng, lat], zoom: 13 });
         }
     }, [lat, lng]);
+
+    if (!MAPBOX_TOKEN) {
+        return (
+            <div className="w-full h-full bg-slate-800 text-slate-400 flex flex-col items-center justify-center text-sm font-medium rounded-lg gap-2 py-8">
+                <span className="text-2xl">🗺️</span>
+                <span>Map unavailable</span>
+                <span className="text-xs text-slate-500">(missing VITE_MAPBOX_TOKEN)</span>
+            </div>
+        );
+    }
 
     return <div ref={mapContainer} className="w-full h-full" />;
 };

@@ -36,15 +36,15 @@ export const isAppError = (error: unknown): error is AppError => {
  * Best-effort error message extraction.
  * Use for logging and safe user-facing fallbacks.
  */
-export function getErrorMessage(error: unknown): string | null {
-    if (error == null) return null;
+export function getErrorMessage(error: unknown): string | undefined {
+    if (error == null) return undefined;
     if (typeof error === "string") return error;
-    if (error instanceof Error) return error.message || null;
+    if (error instanceof Error) return error.message || undefined;
     try {
         // Some libraries throw plain objects with `message`
         const msg = (error as any)?.message;
-        return typeof msg === "string" ? msg : null;
+        return typeof msg === "string" ? msg : undefined;
     } catch {
-        return null;
+        return undefined;
     }
 }

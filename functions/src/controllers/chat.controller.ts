@@ -27,6 +27,90 @@ const getGenAI = () => {
 
 import { getSystemInstruction } from "../utils/systemPrompts";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL ENFORCEMENT: Intent Detection + Repair System
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DetectedIntent {
+  requiresTool: boolean;
+  suggestedTool: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Detects if a user message likely requires a tool call.
+ * Used to trigger repair loop if Gemini fails to call a tool.
+ */
+function detectActionIntent(message: string): DetectedIntent {
+  const lower = message.toLowerCase();
+
+  // Stay/Property keywords → searchStays
+  const stayPatterns = [
+    /\b(rent|rental|rentals|villa|villas|apartment|apartments)\b/,
+    /\b(stay|stays|accommodation|daily rental|short-term|long-term)\b/,
+    /\b(property|properties|for sale|buy|purchase|house|flat|studio)\b/,
+    /\b(bedroom|bed|room|place to stay)\b/,
+  ];
+  for (const pattern of stayPatterns) {
+    if (pattern.test(lower)) {
+      return { requiresTool: true, suggestedTool: 'searchStays', confidence: 'high' };
+    }
+  }
+
+  // Taxi keywords → dispatchTaxi
+  const taxiPatterns = [
+    /\b(taxi|cab|ride|pickup|pick up|drop off|transfer)\b/,
+    /\b(airport|take me to|drive me|need a ride)\b/,
+  ];
+  for (const pattern of taxiPatterns) {
+    if (pattern.test(lower)) {
+      return { requiresTool: true, suggestedTool: 'dispatchTaxi', confidence: 'high' };
+    }
+  }
+
+  // Service keywords → requestService
+  const servicePatterns = [
+    /\b(plumber|electrician|ac|air conditioning|repair|fix)\b/,
+    /\b(technician|handyman|maintenance|broken)\b/,
+  ];
+  for (const pattern of servicePatterns) {
+    if (pattern.test(lower)) {
+      return { requiresTool: true, suggestedTool: 'requestService', confidence: 'high' };
+    }
+  }
+
+  // Restaurant/Places keywords → searchLocalPlaces
+  const placePatterns = [
+    /\b(restaurant|restaurants|cafe|coffee|bar|beach|club)\b/,
+    /\b(food|eat|dining|lunch|dinner|breakfast)\b/,
+    /\bwhere can i (eat|go|find)\b/,
+  ];
+  for (const pattern of placePatterns) {
+    if (pattern.test(lower)) {
+      return { requiresTool: true, suggestedTool: 'searchLocalPlaces', confidence: 'high' };
+    }
+  }
+
+  return { requiresTool: false, suggestedTool: null, confidence: 'low' };
+}
+
+/**
+ * Repair prompt to force tool calling on retry.
+ * Appended to user message when first attempt fails.
+ */
+const REPAIR_PROMPT = `
+CRITICAL INSTRUCTION: You MUST call a tool NOW.
+
+Do NOT respond with text. You MUST use one of your available tools.
+If you need to search for properties/rentals → call searchStays
+If you need to find restaurants/places → call searchLocalPlaces
+If user needs a taxi → call dispatchTaxi
+
+Use sensible defaults for any missing parameters (e.g., location="North Cyprus").
+
+CALL THE TOOL NOW.
+`;
+
 export const handleChatMessage = async (req: Request, res: Response) => {
   logger.debug("🟦 [Backend] Received chat request");
   const { message, agentId, language, sessionId: clientSessionId } = req.body;
@@ -372,9 +456,17 @@ export const handleChatMessage = async (req: Request, res: Response) => {
 
     // 3. Initialize Model with History
     // Use v1beta API for experimental models with tool support
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash-exp";
+    // Use stable Gemini 2.5 Flash - NOT experimental models
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
     logger.debug(`🤖 Using model: ${modelName}`);
     logger.debug(`📝 Raw env GEMINI_MODEL: ${process.env.GEMINI_MODEL}`);
+
+    // DEBUG: Log all tool names to verify searchMarketplace is NOT in definitions
+    const toolNames = ALL_TOOL_DEFINITIONS.map((t: any) => t.name);
+    logger.info(`🔧 [DEBUG] Tool definitions (${toolNames.length}): ${toolNames.join(', ')}`);
+    if (toolNames.includes('searchMarketplace')) {
+      logger.error(`🚨 [CRITICAL] searchMarketplace is STILL in tool definitions!`);
+    }
 
     const model = getGenAI().getGenerativeModel(
       {
@@ -383,7 +475,9 @@ export const handleChatMessage = async (req: Request, res: Response) => {
         tools: [{ functionDeclarations: ALL_TOOL_DEFINITIONS }],
         toolConfig: {
           functionCallingConfig: {
-            mode: FunctionCallingMode.AUTO, // Allow model to choose when to call functions
+            // AUTO = model decides when tools are needed (correct for conversational + action intents)
+            // ANY = model MUST call a tool (only for pure action intents - causes loops on "hello")
+            mode: FunctionCallingMode.AUTO,
           },
         },
       },
@@ -419,7 +513,42 @@ export const handleChatMessage = async (req: Request, res: Response) => {
 
     // Loop while there are function calls
     let functionCalls = response.functionCalls();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TOOL ENFORCEMENT: Retry with repair prompt if intent detected but no tool called
+    // ─────────────────────────────────────────────────────────────────────────
+    const detectedIntent = detectActionIntent(cleanMessage);
+
+    if (detectedIntent.requiresTool && (!functionCalls || functionCalls.length === 0)) {
+      logger.warn(
+        `⚠️ [Enforcement] Tool required but none called. Intent: ${detectedIntent.suggestedTool} (${detectedIntent.confidence}). Retrying...`
+      );
+
+      // Retry with repair prompt appended
+      const repairMessage = `${cleanMessage}\n\n${REPAIR_PROMPT}\nSuggested tool to use: ${detectedIntent.suggestedTool}`;
+      result = await chat.sendMessage(repairMessage);
+      response = await result.response;
+      functionCalls = response.functionCalls();
+
+      if (functionCalls && functionCalls.length > 0) {
+        logger.info(`✅ [Enforcement] Retry successful - tool called: ${functionCalls[0].name}`);
+      } else {
+        logger.warn(`❌ [Enforcement] Retry failed - no tool called. Falling back to text response.`);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Circuit breaker: prevent infinite tool loops (max 5 iterations per request)
+    const MAX_TOOL_ITERATIONS = 5;
+    let toolIterationCount = 0;
+
     while (functionCalls && functionCalls.length > 0) {
+      // Circuit breaker check
+      toolIterationCount++;
+      if (toolIterationCount > MAX_TOOL_ITERATIONS) {
+        logger.warn(`⚠️ [CircuitBreaker] Max tool iterations (${MAX_TOOL_ITERATIONS}) exceeded. Breaking loop.`);
+        break;
+      }
       // Log "Thinking" if there is text accompanying the tool call
       try {
         const thinking = response.text();
@@ -443,10 +572,15 @@ export const handleChatMessage = async (req: Request, res: Response) => {
 
         try {
           if (
-            fnName === "searchMarketplace" ||
+            // NOTE: searchMarketplace REMOVED - deprecated
             fnName === "searchLocalPlaces" ||
-            fnName === "searchEvents"
+            fnName === "searchEvents" ||
+            fnName === "searchStays" ||
+            fnName === "searchHousingListings"
           ) {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/7207ff65-c9c6-4873-a824-51b8bedf5d3c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chat.controller.ts:579',message:'BEFORE calling search tool resolver',data:{fnName,resolverExists:!!(toolResolvers as any)[fnName],resolverType:typeof (toolResolvers as any)[fnName]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
             const resolver = (toolResolvers as any)[fnName];
             const items = await resolver({
               ...fnArgs,
@@ -610,7 +744,7 @@ export const handleChatMessage = async (req: Request, res: Response) => {
           logger.debug(
             `   Result:`,
             JSON.stringify(toolResult).substring(0, 200) +
-              (JSON.stringify(toolResult).length > 200 ? "..." : ""),
+            (JSON.stringify(toolResult).length > 200 ? "..." : ""),
           );
         } catch (toolErr: unknown) {
           const errorMessage = getErrorMessage(toolErr) || "Unknown error occurred";
@@ -778,7 +912,7 @@ export const reindexListings = async (req: Request, res: Response) => {
           itemAny.rentalType ||
           itemAny.type ||
           (itemAny.domain === "Cars" &&
-          itemAny.category?.toLowerCase() === "rental"
+            itemAny.category?.toLowerCase() === "rental"
             ? "rental"
             : null), // Fallback for legacy data
         location: item.location,

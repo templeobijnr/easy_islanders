@@ -244,6 +244,7 @@ async function runConfirmationGate(
  */
 export async function processMessage(request: ChatRequest): Promise<ChatResponse> {
     const { message, actor, agentId = 'merve' } = request;
+    const traceId = (request as any).traceId || `${actor.userId}:${Date.now()}`;
 
     logger.info(`[Merve] Processing message`, {
         channel: actor.channel,
@@ -310,10 +311,10 @@ ${JSON.stringify(userMemory || {})}
 
         // 5. Initialize Gemini
         const model = getGenAI().getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
             systemInstruction,
             tools: [{ functionDeclarations: ALL_TOOL_DEFINITIONS as any }],
-            toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } }
+            toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.ANY } }
         });
 
         // 6. Start chat with history
@@ -335,7 +336,9 @@ ${JSON.stringify(userMemory || {})}
                 const toolName = call.name;
                 toolCalls.push(toolName);
                 logger.info(`[Merve] Executing tool: ${toolName}`);
-
+                if (toolName === 'searchMarketplace') {
+                    logger.warn(`[Merve] ALERT: searchMarketplace tool called despite removal!`);
+                }
                 try {
                     const resolver = (toolResolvers as Record<string, any>)[toolName];
                     if (!resolver) {
@@ -367,6 +370,20 @@ ${JSON.stringify(userMemory || {})}
                     }
 
                     // Execute tool with context
+                    const attemptId = `tool:${sessionId}:${toolName}:${Date.now()}`;
+                    const startedAt = Date.now();
+                    await db.collection('toolAttempts').doc(attemptId).set({
+                        id: attemptId,
+                        sessionId,
+                        userId: actor.userId,
+                        agentId,
+                        toolName,
+                        args: call.args || {},
+                        status: 'started',
+                        traceId,
+                        createdAt: new Date().toISOString(),
+                    });
+
                     const toolResult = await resolver(call.args as any, {
                         userId: actor.userId,
                         sessionId,
@@ -374,6 +391,13 @@ ${JSON.stringify(userMemory || {})}
                         actor,
                         location: request.location,
                         marketId,
+                    });
+
+                    await db.collection('toolAttempts').doc(attemptId).update({
+                        status: toolResult?.success === false ? 'failed' : 'completed',
+                        durationMs: Date.now() - startedAt,
+                        result: toolResult ?? null,
+                        updatedAt: new Date().toISOString(),
                     });
 
                     toolResults.push({
